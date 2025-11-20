@@ -699,7 +699,7 @@ class _MotionSensitivitySelector extends StatelessWidget {
                   ),
                 ),
                 if (isCurrent)
-                  Icon(
+                  const Icon(
                     Icons.check,
                     size: 18,
                     color: SafeOnColors.textSecondary,
