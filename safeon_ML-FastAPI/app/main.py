@@ -55,7 +55,6 @@ def predict(payload: PredictionRequest) -> PredictionResponse:
     if not payload.features:
         raise HTTPException(status_code=400, detail="Feature list cannot be empty")
 
-    # Placeholder prediction logic; replace with actual model inference.
     dummy_score = min(0.99, 0.5 + (sum(payload.features) % 1) / 2)
     return PredictionResponse(
         label="safe" if dummy_score >= 0.5 else "unsafe",
