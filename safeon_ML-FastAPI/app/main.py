@@ -6,22 +6,26 @@ predict endpoint that accepts JSON payloads describing the features.
 """
 
 from datetime import datetime
-from typing import List, Optional
+from typing import Optional
 
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
-app = FastAPI(title="SafeOn ML API", version="0.1.0")
+from .model import FlowFeatures, ModelService
+
+app = FastAPI(title="SafeOn ML API", version="0.2.0")
+model_service = ModelService.from_env()
 
 
 class PredictionRequest(BaseModel):
     """Payload schema expected from upstream services.
 
-    The schema can be adjusted to match the exact inputs the ML model needs.
+    This schema matches the network-flow dataset shape shared by the user
+    (src/dst IPs and ports, protocol, packet/byte counts, timings, throughput).
     """
 
     user_id: str = Field(..., description="Unique identifier for the request originator")
-    features: List[float] = Field(..., description="Numeric feature vector for the model")
+    flow: FlowFeatures
     timestamp: Optional[datetime] = Field(
         default=None,
         description="Optional timestamp (UTC) when the features were generated",
@@ -36,11 +40,23 @@ class PredictionResponse(BaseModel):
     received_at: datetime
 
 
-@app.get("/health", summary="Health check")
-def health() -> dict:
+class HealthResponse(BaseModel):
+    """Health payload that includes model readiness."""
+
+    status: str
+    model_loaded: bool
+    mode: str
+
+
+@app.get("/health", summary="Health check", response_model=HealthResponse)
+def health() -> HealthResponse:
     """Return service status for liveness checks."""
 
-    return {"status": "ok"}
+    return HealthResponse(
+        status="ok",
+        model_loaded=model_service.model_loaded,
+        mode="model" if model_service.model_loaded else "dummy",
+    )
 
 
 @app.post("/predict", response_model=PredictionResponse, summary="Run model inference")
@@ -48,17 +64,21 @@ def predict(payload: PredictionRequest) -> PredictionResponse:
     """Run model inference.
 
     Replace the placeholder logic with actual model loading and prediction once the
-    Python ML model is available. The endpoint currently checks that features exist
-    and returns a dummy label and confidence score.
+    Python ML model is available. The endpoint currently checks that a flow record
+    is provided and returns a dummy label and confidence score when no trained
+    model is loaded.
     """
 
-    if not payload.features:
-        raise HTTPException(status_code=400, detail="Feature list cannot be empty")
+    try:
+        label, confidence = model_service.predict(payload.flow)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
 
-    dummy_score = min(0.99, 0.5 + (sum(payload.features) % 1) / 2)
     return PredictionResponse(
-        label="safe" if dummy_score >= 0.5 else "unsafe",
-        confidence=round(dummy_score, 4),
+        label=label,
+        confidence=confidence,
         received_at=datetime.utcnow(),
     )
 
