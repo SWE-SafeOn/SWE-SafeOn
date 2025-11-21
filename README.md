@@ -14,6 +14,11 @@ Through SafeOn, we can make a practical, scalable, and privacy-conscious approac
 
 ---
 
+##  System Architecture
+
+
+---
+
 ## Group Members
 | Name | Organization | Email |
 |------|-------------|--------|
