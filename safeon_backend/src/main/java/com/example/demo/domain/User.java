@@ -27,19 +27,14 @@ public class User {
 
     private String name;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "default_tenant_id")
-    private Tenant defaultTenant;
-
     @Column(name = "registered_at")
     private OffsetDateTime registeredAt;
 
-    public static User create(String email, String password, String name, Tenant defaultTenant, OffsetDateTime registeredAt) {
+    public static User create(String email, String password, String name, OffsetDateTime registeredAt) {
         User user = new User();
         user.email = email;
         user.password = password;
         user.name = name;
-        user.defaultTenant = defaultTenant;
         user.registeredAt = registeredAt;
         return user;
     }

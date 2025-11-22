@@ -9,28 +9,16 @@ import java.util.Optional;
 import java.util.UUID;
 
 public interface UserAlertRepository extends JpaRepository<UserAlert, UUID> {
-    List<UserAlert> findByUserUserIdAndAlertTenantTenantIdOrderByNotifiedAtDesc(UUID userId, UUID tenantId);
+    List<UserAlert> findByUserUserIdOrderByNotifiedAtDesc(UUID userId);
 
-    long countByUserUserIdAndAlertTenantTenantId(UUID userId, UUID tenantId);
+    long countByUserUserId(UUID userId);
 
-    Optional<UserAlert> findByUserUserIdAndAlertAlertIdAndAlertTenantTenantId(UUID userId, UUID alertId, UUID tenantId);
+    Optional<UserAlert> findByUserUserIdAndAlertAlertId(UUID userId, UUID alertId);
 
-    Optional<UserAlert> findFirstByUserUserIdAndAlertTenantTenantIdOrderByNotifiedAtDesc(UUID userId, UUID tenantId);
+    Optional<UserAlert> findFirstByUserUserIdOrderByNotifiedAtDesc(UUID userId);
 
-    Optional<UserAlert> findFirstByAlertAlertIdAndAlertTenantTenantId(UUID alertId, UUID tenantId);
-
-    default UserAlert getByUserUserIdAndAlertAlertIdAndAlertTenantTenantId(UUID userId, UUID alertId, UUID tenantId) {
-        return findByUserUserIdAndAlertAlertIdAndAlertTenantTenantId(userId, alertId, tenantId)
+    default UserAlert getByUserUserIdAndAlertAlertId(UUID userId, UUID alertId) {
+        return findByUserUserIdAndAlertAlertId(userId, alertId)
                 .orElseThrow(() -> new EntityNotFoundException("해당 사용자와 연관된 알림이 없습니다."));
-    }
-
-    default UserAlert getLatestByUserAndTenant(UUID userId, UUID tenantId) {
-        return findFirstByUserUserIdAndAlertTenantTenantIdOrderByNotifiedAtDesc(userId, tenantId)
-                .orElseThrow(() -> new EntityNotFoundException("최근 알림을 찾을 수 없습니다."));
-    }
-
-    default UserAlert getByAlertIdAndTenant(UUID alertId, UUID tenantId) {
-        return findFirstByAlertAlertIdAndAlertTenantTenantId(alertId, tenantId)
-                .orElseThrow(() -> new EntityNotFoundException("알림을 찾을 수 없습니다."));
     }
 }

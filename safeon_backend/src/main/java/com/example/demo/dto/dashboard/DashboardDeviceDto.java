@@ -7,22 +7,24 @@ import lombok.Builder;
 public record DashboardDeviceDto(
         String id,
         String vendor,
-        String model,
-        String category,
-        String status,
+        String ip,
+        String macAddr,
+        Boolean discovered,
         String createdAt,
-        String linkedAt
+        String linkedAt,
+        String label
 ) {
     public static DashboardDeviceDto from(UserDevice userDevice) {
         var device = userDevice.getDevice();
         return DashboardDeviceDto.builder()
                 .id(device.getDeviceId() != null ? device.getDeviceId().toString() : null)
                 .vendor(device.getVendor())
-                .model(device.getModel())
-                .category(device.getCategory())
-                .status(device.getStatus())
+                .ip(device.getIp())
+                .macAddr(device.getMacAddr())
+                .discovered(device.getDiscovered())
                 .createdAt(device.getCreatedAt() != null ? device.getCreatedAt().toString() : null)
                 .linkedAt(userDevice.getLinkedAt() != null ? userDevice.getLinkedAt().toString() : null)
+                .label(userDevice.getLabel())
                 .build();
     }
 }

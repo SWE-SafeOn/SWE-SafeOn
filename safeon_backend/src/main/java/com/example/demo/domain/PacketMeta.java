@@ -1,9 +1,7 @@
 package com.example.demo.domain;
 
 import jakarta.persistence.*;
-import lombok.AccessLevel;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
+import lombok.*;
 
 import java.time.OffsetDateTime;
 import java.util.UUID;
@@ -11,18 +9,19 @@ import java.util.UUID;
 @Entity
 @Table(name = "packet_meta")
 @Getter
-@NoArgsConstructor(access = AccessLevel.PROTECTED)
+@Setter
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class PacketMeta {
 
     @Id
-    @Column(name = "packet_id")
     @GeneratedValue(generator = "uuid2")
-    private UUID packetId;
+    @Column(name = "packet_meta_id")
+    private UUID packetMetaId;
 
-    private OffsetDateTime ts;
-
-    @Column(name = "iface_id")
-    private UUID ifaceId;
+    @Column(name = "flow_id")
+    private UUID flow;
 
     @Column(name = "src_ip")
     private String srcIp;
@@ -36,47 +35,30 @@ public class PacketMeta {
     @Column(name = "dst_port")
     private Short dstPort;
 
-    @Column(name = "l3_proto")
-    private String l3Proto;
+    @Column(name = "proto")
+    private String proto;
 
-    @Column(name = "l4_proto")
-    private String l4Proto;
+    @Column(name = "time_bucket")
+    private String timeBucket;
 
-    @Column(name = "l7_proto")
-    private String l7Proto;
+    @Column(name = "start_time")
+    private OffsetDateTime startTime;
 
-    @Column(name = "size_bytes")
-    private Integer sizeBytes;
+    @Column(name = "end_time")
+    private OffsetDateTime endTime;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "tenant_id")
-    private Tenant tenant;
+    private Double duration;
 
-    public static PacketMeta create(
-            OffsetDateTime ts,
-            UUID ifaceId,
-            String srcIp,
-            String dstIp,
-            Short srcPort,
-            Short dstPort,
-            String l3Proto,
-            String l4Proto,
-            String l7Proto,
-            Integer sizeBytes,
-            Tenant tenant
-    ) {
-        PacketMeta meta = new PacketMeta();
-        meta.ts = ts;
-        meta.ifaceId = ifaceId;
-        meta.srcIp = srcIp;
-        meta.dstIp = dstIp;
-        meta.srcPort = srcPort;
-        meta.dstPort = dstPort;
-        meta.l3Proto = l3Proto;
-        meta.l4Proto = l4Proto;
-        meta.l7Proto = l7Proto;
-        meta.sizeBytes = sizeBytes;
-        meta.tenant = tenant;
-        return meta;
-    }
+    @Column(name = "packet_count")
+    private Integer packetCount;
+
+    @Column(name = "byte_count")
+    private Long byteCount;
+
+    private Double pps;
+
+    private Double bps;
+
+    private Integer label;
+
 }

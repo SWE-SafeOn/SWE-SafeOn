@@ -12,13 +12,6 @@ import java.util.UUID;
 public interface AlertRepository extends JpaRepository<Alert, UUID> {
     Optional<Alert> findByAlertId(UUID alertId);
 
-    Optional<Alert> findByAlertIdAndTenantTenantId(UUID alertId, UUID tenantId);
-
-    default Alert getByAlertIdAndTenantTenantId(UUID alertId, UUID tenantId) {
-        return findByAlertIdAndTenantTenantId(alertId, tenantId)
-                .orElseThrow(() -> new EntityNotFoundException("알림을 찾을 수 없습니다 : " + alertId));
-    }
-
     default Alert getByAlertId(UUID alertId) {
         return findByAlertId(alertId)
                 .orElseThrow(() -> new EntityNotFoundException("알림을 찾을 수 없습니다 : " + alertId));

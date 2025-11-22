@@ -8,7 +8,6 @@ public record UserResponseDto(
         String id,
         String email,
         String name,
-        String defaultTenantId,
         String registeredAt
 ) {
     public static UserResponseDto from(User user) {
@@ -16,7 +15,6 @@ public record UserResponseDto(
                 .id(user.getUserId().toString())
                 .email(user.getEmail())
                 .name(user.getName())
-                .defaultTenantId(user.getDefaultTenant() != null ? user.getDefaultTenant().getTenantId().toString() : null)
                 .registeredAt(user.getRegisteredAt() != null ? user.getRegisteredAt().toString() : null)
                 .build();
     }

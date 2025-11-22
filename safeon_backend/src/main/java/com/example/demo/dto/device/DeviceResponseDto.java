@@ -10,37 +10,36 @@ import java.util.UUID;
 public record DeviceResponseDto(
         String id,
         String userId,
-        String tenantId,
         String vendor,
-        String model,
+        String ip,
         String macAddr,
-        String category,
-        String status,
+        Boolean discovered,
         String createdAt,
-        String linkedAt
+        String linkedAt,
+        String label
 ) {
 
     public static DeviceResponseDto from(UserDevice userDevice) {
         return from(userDevice.getDevice(), userDevice.getUser().getUserId(),
-                userDevice.getLinkedAt() != null ? userDevice.getLinkedAt().toString() : null);
+                userDevice.getLinkedAt() != null ? userDevice.getLinkedAt().toString() : null,
+                userDevice.getLabel());
     }
 
     public static DeviceResponseDto from(Device device, UUID userId) {
-        return from(device, userId, null);
+        return from(device, userId, null, null);
     }
 
-    private static DeviceResponseDto from(Device device, UUID userId, String linkedAt) {
+    private static DeviceResponseDto from(Device device, UUID userId, String linkedAt, String label) {
         return DeviceResponseDto.builder()
                 .id(device.getDeviceId() != null ? device.getDeviceId().toString() : null)
                 .userId(userId != null ? userId.toString() : null)
-                .tenantId(device.getTenant() != null ? device.getTenant().getTenantId().toString() : null)
                 .vendor(device.getVendor())
-                .model(device.getModel())
+                .ip(device.getIp())
                 .macAddr(device.getMacAddr())
-                .category(device.getCategory())
-                .status(device.getStatus())
+                .discovered(device.getDiscovered())
                 .createdAt(device.getCreatedAt() != null ? device.getCreatedAt().toString() : null)
                 .linkedAt(linkedAt)
+                .label(label)
                 .build();
     }
 }

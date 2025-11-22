@@ -1,12 +1,10 @@
 package com.example.demo.service;
 
-import com.example.demo.dto.alert.AlertResponseDto;
 import com.example.demo.domain.Alert;
 import com.example.demo.domain.UserAlert;
+import com.example.demo.dto.alert.AlertResponseDto;
 import com.example.demo.repository.AlertRepository;
 import com.example.demo.repository.UserAlertRepository;
-import com.example.demo.repository.UserTenantRepository;
-import com.example.demo.security.AuthContext;
 import com.example.demo.util.UuidParser;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -24,41 +22,29 @@ public class AlertService {
     private final AlertRepository alertRepository;
     private final UserAlertRepository userAlertRepository;
     private final DashboardService dashboardService;
-    private final UserTenantRepository userTenantRepository;
 
     @Transactional(readOnly = true)
-    public List<AlertResponseDto> getAlerts(AuthContext.TenantSession session) {
-        UUID userId = session.userId();
-        UUID tenantId = session.tenantId();
-        validateUserTenant(userId, tenantId);
+    public List<AlertResponseDto> getAlerts(UUID userId) {
         return userAlertRepository
-                .findByUserUserIdAndAlertTenantTenantIdOrderByNotifiedAtDesc(userId, tenantId)
+                .findByUserUserIdOrderByNotifiedAtDesc(userId)
                 .stream()
                 .map(AlertResponseDto::from)
                 .toList();
     }
 
     @Transactional(readOnly = true)
-    public AlertResponseDto getAlert(String alertId, AuthContext.TenantSession session) {
-        UUID userId = session.userId();
-        UUID tenantId = session.tenantId();
-        validateUserTenant(userId, tenantId);
+    public AlertResponseDto getAlert(String alertId, UUID userId) {
         UUID alertUuid = UuidParser.parseUUID(alertId);
-        UserAlert userAlert = userAlertRepository.getByUserUserIdAndAlertAlertIdAndAlertTenantTenantId(userId, alertUuid, tenantId);
+        UserAlert userAlert = userAlertRepository.getByUserUserIdAndAlertAlertId(userId, alertUuid);
         userAlert.ensureUser(userId);
-        userAlert.ensureTenant(tenantId);
         return AlertResponseDto.from(userAlert);
     }
 
     @Transactional
-    public AlertResponseDto acknowledgeAlert(String alertId, AuthContext.TenantSession session) {
-        UUID userId = session.userId();
-        UUID tenantId = session.tenantId();
-        validateUserTenant(userId, tenantId);
+    public AlertResponseDto acknowledgeAlert(String alertId, UUID userId) {
         UUID alertUuid = UuidParser.parseUUID(alertId);
-        UserAlert userAlert = userAlertRepository.getByUserUserIdAndAlertAlertIdAndAlertTenantTenantId(userId, alertUuid, tenantId);
+        UserAlert userAlert = userAlertRepository.getByUserUserIdAndAlertAlertId(userId, alertUuid);
         userAlert.ensureUser(userId);
-        userAlert.ensureTenant(tenantId);
 
         Alert alert = userAlert.getAlert();
         alert.updateStatus(STATUS_ACKNOWLEDGED);
@@ -68,9 +54,5 @@ public class AlertService {
         dashboardService.sendAlertToUser(userAlert);
 
         return AlertResponseDto.from(userAlert);
-    }
-
-    private void validateUserTenant(UUID userId, UUID tenantId) {
-        userTenantRepository.validateUserBelongsToTenant(userId, tenantId);
     }
 }

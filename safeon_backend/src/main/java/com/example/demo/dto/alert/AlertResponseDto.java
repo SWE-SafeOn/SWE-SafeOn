@@ -8,7 +8,6 @@ import lombok.Builder;
 public record AlertResponseDto(
         String id,
         String userId,
-        String tenantId,
         String deviceId,
         String severity,
         String reason,
@@ -26,15 +25,10 @@ public record AlertResponseDto(
                 userAlert.getDeliveryStatus());
     }
 
-    public static AlertResponseDto from(Alert alert, String userId) {
-        return from(alert, userId, null, null);
-    }
-
     private static AlertResponseDto from(Alert alert, String userId, Boolean read, String deliveryStatus) {
         return AlertResponseDto.builder()
                 .id(alert.getAlertId() != null ? alert.getAlertId().toString() : null)
                 .userId(userId)
-                .tenantId(alert.getTenant() != null ? alert.getTenant().getTenantId().toString() : null)
                 .deviceId(alert.getDevice() != null && alert.getDevice().getDeviceId() != null
                         ? alert.getDevice().getDeviceId().toString()
                         : null)

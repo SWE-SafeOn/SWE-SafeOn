@@ -10,10 +10,12 @@ import java.util.UUID;
 
 @Repository
 public interface DeviceRepository extends JpaRepository<Device, UUID> {
-    Optional<Device> findByDeviceIdAndTenantTenantId(UUID deviceId, UUID tenantId);
+    Optional<Device> findByDeviceId(UUID deviceId);
 
-    default Device getByDeviceIdAndTenantTenantId(UUID deviceId, UUID tenantId) {
-        return findByDeviceIdAndTenantTenantId(deviceId, tenantId)
+    java.util.List<Device> findAllByDiscovered(Boolean discovered);
+
+    default Device getByDeviceId(UUID deviceId) {
+        return findByDeviceId(deviceId)
                 .orElseThrow(() -> new EntityNotFoundException("디바이스를 찾을 수 없습니다 : " + deviceId));
     }
 }

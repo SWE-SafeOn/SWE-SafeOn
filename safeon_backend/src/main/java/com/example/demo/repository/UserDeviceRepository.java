@@ -9,25 +9,23 @@ import java.util.Optional;
 import java.util.UUID;
 
 public interface UserDeviceRepository extends JpaRepository<UserDevice, UUID> {
-    List<UserDevice> findAllByUserUserIdAndDeviceTenantTenantId(UUID userId, UUID tenantId);
+    List<UserDevice> findAllByUserUserId(UUID userId);
 
-    Optional<UserDevice> findByDeviceDeviceIdAndUserUserIdAndDeviceTenantTenantId(UUID deviceId, UUID userId, UUID tenantId);
+    Optional<UserDevice> findByDeviceDeviceIdAndUserUserId(UUID deviceId, UUID userId);
 
-    long countByUserUserIdAndDeviceTenantTenantId(UUID userId, UUID tenantId);
+    long countByUserUserId(UUID userId);
 
-    long countByUserUserIdAndDeviceStatusAndDeviceTenantTenantId(UUID userId, String status, UUID tenantId);
+    List<UserDevice> findAllByDeviceDeviceId(UUID deviceId);
 
-    List<UserDevice> findAllByDeviceDeviceIdAndDeviceTenantTenantId(UUID deviceId, UUID tenantId);
+    Optional<UserDevice> findFirstByDeviceDeviceId(UUID deviceId);
 
-    Optional<UserDevice> findFirstByDeviceDeviceIdAndDeviceTenantTenantId(UUID deviceId, UUID tenantId);
-
-    default UserDevice getByDeviceAndUserAndTenant(UUID deviceId, UUID userId, UUID tenantId) {
-        return findByDeviceDeviceIdAndUserUserIdAndDeviceTenantTenantId(deviceId, userId, tenantId)
+    default UserDevice getByDeviceAndUser(UUID deviceId, UUID userId) {
+        return findByDeviceDeviceIdAndUserUserId(deviceId, userId)
                 .orElseThrow(() -> new EntityNotFoundException("해당 사용자와 디바이스가 연결되지 않았습니다."));
     }
 
-    default UserDevice getFirstByDeviceAndTenant(UUID deviceId, UUID tenantId) {
-        return findFirstByDeviceDeviceIdAndDeviceTenantTenantId(deviceId, tenantId)
+    default UserDevice getFirstByDevice(UUID deviceId) {
+        return findFirstByDeviceDeviceId(deviceId)
                 .orElseThrow(() -> new EntityNotFoundException("디바이스 연결 정보를 찾을 수 없습니다."));
     }
 }
