@@ -60,12 +60,12 @@ class DeviceCard extends StatelessWidget {
               ),
               const SizedBox(height: 24),
               Text(
-                device.name,
+                device.displayName,
                 style: theme.textTheme.titleLarge,
               ),
               const SizedBox(height: 4),
               Text(
-                device.location,
+                device.locationLabel,
                 style: theme.textTheme.bodyMedium,
               ),
               const SizedBox(height: 20),
