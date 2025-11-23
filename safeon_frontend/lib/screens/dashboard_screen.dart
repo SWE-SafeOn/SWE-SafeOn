@@ -208,7 +208,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
             padding: const EdgeInsets.only(right: 16),
             child: CircleAvatar(
               radius: 18,
-              // ignore: deprecated_member_use
               backgroundColor: SafeOnColors.primary.withOpacity(0.2),
               child: Text(
                 _avatarLabel,
@@ -232,6 +231,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             _buildProfileTab(context),
           ],
         ),
+      ),
         bottomNavigationBar: BottomNavigationBar(
           currentIndex: _selectedIndex,
           onTap: (index) => setState(() => _selectedIndex = index),
