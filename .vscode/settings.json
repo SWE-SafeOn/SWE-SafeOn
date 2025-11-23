@@ -1,3 +1,4 @@
 {
-    "cmake.sourceDirectory": "/Users/jeongjaemin/SWE-SafeOn/safeonapp/linux"
+    "cmake.sourceDirectory": "/Users/jeongjaemin/SWE-SafeOn/safeonapp/linux",
+    "java.configuration.updateBuildConfiguration": "interactive"
 }

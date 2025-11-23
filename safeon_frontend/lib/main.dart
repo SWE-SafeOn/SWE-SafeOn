@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 
+import 'models/user_profile.dart';
+import 'models/user_session.dart';
 import 'screens/dashboard_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/onboarding_screen.dart';
+import 'services/safeon_api.dart';
 import 'theme/app_theme.dart';
 
 void main() {
@@ -17,36 +20,37 @@ class SafeOnApp extends StatefulWidget {
 }
 
 class _SafeOnAppState extends State<SafeOnApp> {
+  final SafeOnApiClient _apiClient = SafeOnApiClient();
   bool _completedOnboarding = false;
-  bool _authenticated = false;
-  String _userEmail = 'Godten@example.com';
-  String _userNickname = 'Young';
-  String _userPassword = 'Secur3Pass!';
+  UserSession? _session;
+  String _cachedEmail = 'Godten@example.com';
+  String _cachedNickname = 'Young';
+  String _cachedPassword = 'Secur3Pass!';
 
   void _completeOnboarding() {
     setState(() => _completedOnboarding = true);
   }
 
-  void _handleLoginSuccess(String email, String password, String nickname) {
+  void _handleLoginSuccess(UserSession session, String password) {
     setState(() {
-      _authenticated = true;
-      _userEmail = email;
-      _userPassword = password;
-      _userNickname = nickname;
+      _session = session;
+      _cachedEmail = session.profile.email;
+      _cachedPassword = password;
+      _cachedNickname = session.profile.name;
     });
   }
 
-  void _handleProfileUpdated(String email, String password, String nickname) {
+  void _handleProfileUpdated(UserProfile updatedProfile) {
+    if (_session == null) return;
     setState(() {
-      _userEmail = email;
-      _userPassword = password;
-      _userNickname = nickname;
+      _session = _session!.copyWith(profile: updatedProfile);
+      _cachedNickname = updatedProfile.name;
     });
   }
 
   void _handleLogout() {
     setState(() {
-      _authenticated = false;
+      _session = null;
       _completedOnboarding = true;
     });
   }
