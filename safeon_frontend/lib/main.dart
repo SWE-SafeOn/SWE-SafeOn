@@ -62,19 +62,19 @@ class _SafeOnAppState extends State<SafeOnApp> {
       debugShowCheckedModeBanner: false,
       theme: buildSafeOnTheme(),
       home: _completedOnboarding
-          ? _authenticated
+          ? _session != null
               ? DashboardScreen(
                   onLogout: _handleLogout,
                   onProfileUpdated: _handleProfileUpdated,
-                  userEmail: _userEmail,
-                  userNickname: _userNickname,
-                  userPassword: _userPassword,
+                  session: _session!,
+                  apiClient: _apiClient,
                 )
               : LoginScreen(
                   onLoginSuccess: _handleLoginSuccess,
-                  initialEmail: _userEmail,
-                  initialPassword: _userPassword,
-                  initialNickname: _userNickname,
+                  apiClient: _apiClient,
+                  initialEmail: _cachedEmail,
+                  initialPassword: _cachedPassword,
+                  initialNickname: _cachedNickname,
                 )
           : OnboardingScreen(onContinue: _completeOnboarding),
     );
