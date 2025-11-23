@@ -1,8 +1,13 @@
 import 'package:characters/characters.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 
 import '../models/alert.dart';
 import '../models/device.dart';
+import '../models/dashboard_overview.dart';
+import '../models/user_profile.dart';
+import '../models/user_session.dart';
+import '../services/safeon_api.dart';
 import '../theme/app_theme.dart';
 import '../widgets/alert_tile.dart';
 import '../widgets/device_card.dart';
@@ -57,17 +62,14 @@ class DashboardScreen extends StatefulWidget {
     super.key,
     required this.onLogout,
     required this.onProfileUpdated,
-    required this.userEmail,
-    required this.userNickname,
-    required this.userPassword,
+    required this.session,
+    required this.apiClient,
   });
 
   final VoidCallback onLogout;
-  final void Function(String email, String password, String nickname)
-      onProfileUpdated;
-  final String userEmail;
-  final String userNickname;
-  final String userPassword;
+  final void Function(UserProfile updatedProfile) onProfileUpdated;
+  final UserSession session;
+  final SafeOnApiClient apiClient;
 
   @override
   State<DashboardScreen> createState() => _DashboardScreenState();
@@ -75,9 +77,12 @@ class DashboardScreen extends StatefulWidget {
 
 class _DashboardScreenState extends State<DashboardScreen> {
   int _selectedIndex = 0;
-  late String _email;
-  late String _nickname;
-  late String _password;
+  late UserProfile _profile;
+  DashboardOverview? _overview;
+  List<SafeOnDevice> _devices = const [];
+  List<SafeOnAlert> _alerts = const [];
+  bool _isLoading = true;
+  String? _errorMessage;
   bool _isNightlyAutoArmEnabled = true;
   bool _isHomeModeArmed = true;
   bool _isAutomationActive = true;
@@ -88,62 +93,61 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   void initState() {
     super.initState();
-    _email = widget.userEmail;
-    _nickname = widget.userNickname;
-    _password = widget.userPassword;
+    _profile = widget.session.profile;
+    _loadDashboard();
   }
 
   @override
   void didUpdateWidget(covariant DashboardScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.userEmail != widget.userEmail ||
-        oldWidget.userNickname != widget.userNickname ||
-        oldWidget.userPassword != widget.userPassword) {
-      _email = widget.userEmail;
-      _nickname = widget.userNickname;
-      _password = widget.userPassword;
+    if (oldWidget.session.profile != widget.session.profile) {
+      _profile = widget.session.profile;
     }
   }
 
   String get _avatarLabel {
-    final trimmed = _nickname.trim();
+    final trimmed = _profile.name.trim();
     return trimmed.isNotEmpty ? trimmed.characters.first.toUpperCase() : 'S';
   }
 
-  final List<SafeOnDevice> devices = [
-    const SafeOnDevice(
-      name: 'Front Door Camera',
-      location: 'Entrance Hall',
-      status: 'Secure',
-      connectionStrength: 0.82,
-      isOnline: true,
-      icon: 'camera',
-    ),
-    const SafeOnDevice(
-      name: 'Living Room Hub',
-      location: 'Living Area',
-      status: 'Monitoring',
-      connectionStrength: 0.67,
-      isOnline: true,
-      icon: 'hub',
-    ),
-  ];
+  Future<void> _loadDashboard() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
 
-  final List<SafeOnAlert> alerts = [
-    SafeOnAlert(
-      title: 'Unrecognized motion detected',
-      description:
-          'Motion detected near the backyard door at 10:14 PM. Reviewing footage now.',
-      timestamp: DateTime.now().subtract(const Duration(minutes: 8)),
-      severity: AlertSeverity.high,
-    ),
-    SafeOnAlert(
-      title: 'Device health warning',
-      description: 'Battery level low on Garage Sensor. Consider replacing soon.',
-      timestamp: DateTime.now().subtract(const Duration(hours: 3, minutes: 22)),
-      severity: AlertSeverity.medium,
-    ),
-  ];
+    try {
+      final token = widget.session.token;
+      final overview = widget.apiClient.fetchDashboardOverview(token);
+      final devices = widget.apiClient.fetchDashboardDevices(token);
+      final alerts = widget.apiClient.fetchRecentAlerts(token, limit: 10);
+      final results = await Future.wait([
+        overview,
+        devices,
+        alerts,
+      ]);
+
+      if (!mounted) return;
+      setState(() {
+        _overview = results[0] as DashboardOverview;
+        _devices = results[1] as List<SafeOnDevice>;
+        _alerts = results[2] as List<SafeOnAlert>;
+        _isLoading = false;
+      });
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _errorMessage = e.message;
+        _isLoading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _errorMessage = '대시보드 데이터를 불러오지 못했습니다.';
+        _isLoading = false;
+      });
+    }
+  }
 
   Future<void> _openQrAddDeviceSheet() async {
     final scaffoldMessenger = ScaffoldMessenger.of(context);
@@ -188,7 +192,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
             const SizedBox(height: 2),
             Text(
-              'Welcome back, $_nickname',
+              'Welcome back, ${_profile.name}',
               style: theme.textTheme.bodyMedium,
             ),
           ],
@@ -217,43 +221,63 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
         ],
       ),
-      body: IndexedStack(
-        index: _selectedIndex,
-        children: [
-          _buildHomeTab(context),
-          _buildAlertsTab(context),
-          _buildDevicesTab(context),
-          _buildProfileTab(context),
-        ],
-      ),
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _selectedIndex,
-        onTap: (index) => setState(() => _selectedIndex = index),
-        items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.home_outlined),
-            label: 'Home',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.warning_amber_rounded),
-            label: 'Alerts',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.devices_other_outlined),
-            label: 'Devices',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.person_outline),
-            label: 'Profile',
-          ),
-        ],
-      ),
-    );
-  }
+      body: RefreshIndicator(
+        onRefresh: _loadDashboard,
+        child: IndexedStack(
+          index: _selectedIndex,
+          children: [
+            _buildHomeTab(context),
+            _buildAlertsTab(context),
+            _buildDevicesTab(context),
+            _buildProfileTab(context),
+          ],
+        ),
+        bottomNavigationBar: BottomNavigationBar(
+          currentIndex: _selectedIndex,
+          onTap: (index) => setState(() => _selectedIndex = index),
+          items: const [
+            BottomNavigationBarItem(
+              icon: Icon(Icons.home_outlined),
+              label: 'Home',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.warning_amber_rounded),
+              label: 'Alerts',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.devices_other_outlined),
+              label: 'Devices',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.person_outline),
+              label: 'Profile',
+            ),
+          ],
+        ),
+      );
+    }
 
   Widget _buildHomeTab(BuildContext context) {
-    final theme = Theme.of(context);
+    if (_isLoading) {
+      return _buildLoadingPlaceholder();
+    }
+
+    if (_errorMessage != null) {
+      return _buildErrorPlaceholder();
+    }
+
+    final overview = _overview;
+    final totalDevices = overview?.totalDevices ?? 0;
+    final onlineDevices = overview?.onlineDevices ?? 0;
+    final alertCount = overview?.alertCount ?? 0;
+    final lastAlertTime = overview?.lastAlertTime;
+    final lastAlertLabel = lastAlertTime != null
+        ? DateFormat('MM/dd HH:mm').format(lastAlertTime.toLocal())
+        : 'No alerts yet';
+
+
     return SingleChildScrollView(
+      physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -297,31 +321,31 @@ class _DashboardScreenState extends State<DashboardScreen> {
             crossAxisSpacing: 16,
             mainAxisSpacing: 16,
             childAspectRatio: 0.96,
-            children: const [
+            children: [
               StatCard(
-                title: 'Active Devices',
-                value: '12',
-                delta: '+2 online',
+                title: '총 기기 수',
+                value: '$totalDevices',
+                delta: '$onlineDevices online',
                 icon: Icons.podcasts,
               ),
-              StatCard(
-                title: 'Incidents Resolved',
-                value: '28',
-                delta: '98% success',
+              const StatCard(
+                title: '네트워크 상태',
+                value: '정상',
+                delta: '모든 서비스 정상',
                 icon: Icons.verified_user,
                 color: SafeOnColors.success,
               ),
               StatCard(
-                title: 'Energy Usage',
-                value: '64%',
-                delta: '-6% today',
-                icon: Icons.energy_savings_leaf,
+                title: '누적 알림',
+                value: '$alertCount',
+                delta: '마지막: $lastAlertLabel',
+                icon: Icons.warning_amber,
                 color: SafeOnColors.accent,
               ),
               StatCard(
-                title: 'Network Health',
-                value: 'Excellent',
-                delta: 'All systems',
+                title: '최근 알림 수집',
+                value: '${_alerts.length}',
+                delta: '최근 24h 기록',
                 icon: Icons.wifi_tethering,
               ),
             ],
@@ -329,21 +353,41 @@ class _DashboardScreenState extends State<DashboardScreen> {
           const SizedBox(height: 32),
           const SectionHeader(title: 'Featured Devices', actionLabel: 'View all'),
           const SizedBox(height: 16),
-          ...devices
-              .map(
-                (device) => Padding(
-                  padding: const EdgeInsets.only(bottom: 18),
-                  child: DeviceCard(
-                    device: device,
-                    onTap: () => _openDeviceDetail(device),
+          if (_devices.isEmpty)
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: SafeOnColors.surface,
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: const Text('연결된 기기가 없습니다. 허브에서 기기를 등록해주세요.'),
+            )
+          else
+            ..._devices
+                .map(
+                  (device) => Padding(
+                    padding: const EdgeInsets.only(bottom: 18),
+                    child: DeviceCard(
+                      device: device,
+                      onTap: () => _openDeviceDetail(device),
+                    ),
                   ),
-                ),
-              )
-              .toList(),
+                )
+                .toList(),
           const SizedBox(height: 12),
           const SectionHeader(title: 'Latest Alerts', actionLabel: 'See history'),
           const SizedBox(height: 12),
-          ...alerts.map((alert) => AlertTile(alert: alert)).toList(),
+          if (_alerts.isEmpty)
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: SafeOnColors.surface,
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: const Text('최근 알림이 없습니다.'),
+            )
+          else
+            ..._alerts.map((alert) => AlertTile(alert: alert)).toList(),
           const SizedBox(height: 32),
         ],
       ),
@@ -351,22 +395,44 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Widget _buildAlertsTab(BuildContext context) {
+    if (_isLoading) {
+      return _buildLoadingPlaceholder();
+    }
+    if (_errorMessage != null) {
+      return _buildErrorPlaceholder();
+    }
+    if (_alerts.isEmpty) {
+      return _buildEmptyList('표시할 알림이 없습니다.');
+    }
+
     return ListView.builder(
+      physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-      itemCount: alerts.length,
-      itemBuilder: (context, index) => AlertTile(alert: alerts[index]),
+      itemCount: _alerts.length,
+      itemBuilder: (context, index) => AlertTile(alert: _alerts[index]),
     );
   }
 
   Widget _buildDevicesTab(BuildContext context) {
+    if (_isLoading) {
+      return _buildLoadingPlaceholder();
+    }
+    if (_errorMessage != null) {
+      return _buildErrorPlaceholder();
+    }
+    if (_devices.isEmpty) {
+      return _buildEmptyList('등록된 디바이스가 없습니다.');
+    }
+
     return ListView.builder(
+      physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-      itemCount: devices.length,
+      itemCount: _devices.length,
       itemBuilder: (context, index) => Padding(
         padding: const EdgeInsets.only(bottom: 18),
         child: DeviceCard(
-          device: devices[index],
-          onTap: () => _openDeviceDetail(devices[index]),
+          device: _devices[index],
+          onTap: () => _openDeviceDetail(_devices[index]),
         ),
       ),
     );
@@ -375,6 +441,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget _buildProfileTab(BuildContext context) {
     final theme = Theme.of(context);
     return SingleChildScrollView(
+      physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -410,9 +477,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(_nickname, style: theme.textTheme.titleLarge),
+                      Text(_profile.name, style: theme.textTheme.titleLarge),
                       const SizedBox(height: 4),
-                      Text(_email, style: theme.textTheme.bodyMedium),
+                      Text(_profile.email, style: theme.textTheme.bodyMedium),
                     ],
                   ),
                 ),
@@ -534,13 +601,65 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
+  Widget _buildLoadingPlaceholder() {
+    return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      children: const [
+        SizedBox(height: 240),
+        Center(child: CircularProgressIndicator()),
+        SizedBox(height: 240),
+      ],
+    );
+  }
+
+  Widget _buildErrorPlaceholder() {
+    return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
+      children: [
+        Column(
+          children: [
+            const Icon(Icons.error_outline, size: 48, color: SafeOnColors.danger),
+            const SizedBox(height: 12),
+            Text(
+              _errorMessage ?? '데이터를 불러올 수 없습니다.',
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodyLarge,
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: _loadDashboard,
+              child: const Text('다시 시도'),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildEmptyList(String message) {
+    return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+      children: [
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: SafeOnColors.surface,
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Text(message),
+        ),
+      ],
+    );
+  }
+
   Future<void> _openProfileEditor() async {
     final result = await Navigator.of(context).push<ProfileDetails>(
       MaterialPageRoute(
         builder: (_) => ProfileEditScreen(
-          initialEmail: _email,
-          initialPassword: _password,
-          initialNickname: _nickname,
+          initialEmail: _profile.email,
+          initialName: _profile.name,
         ),
       ),
     );
@@ -549,13 +668,31 @@ class _DashboardScreenState extends State<DashboardScreen> {
       return;
     }
 
-    setState(() {
-      _email = result.email;
-      _password = result.password;
-      _nickname = result.nickname;
-    });
-
-    widget.onProfileUpdated(result.email, result.password, result.nickname);
+    try {
+      final updatedProfile = await widget.apiClient.updateProfile(
+        token: widget.session.token,
+        name: result.name,
+        password: result.password,
+      );
+      if (!mounted) return;
+      setState(() {
+        _profile = updatedProfile;
+      });
+      widget.onProfileUpdated(updatedProfile);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('프로필이 업데이트되었습니다.')),
+      );
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.message)),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('프로필 업데이트 중 오류가 발생했습니다.')),
+      );
+    }
   }
 
   Widget _buildSettingTile({
