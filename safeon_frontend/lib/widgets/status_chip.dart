@@ -53,9 +53,17 @@ class AlertSeverityChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return StatusChip(
-      label: '${alert.severity.label} • ${DateFormat('MMM d, h:mm a').format(alert.timestamp)}',
+      label: '${alert.severity.label} • ${_formatTimestamp(alert.timestamp)}',
       icon: Icons.warning_amber_rounded,
       color: alert.severity.color,
     );
+  }
+
+  String _formatTimestamp(DateTime? timestamp) {
+    if (timestamp == null) {
+      return '시간 정보 없음';
+    }
+
+    return DateFormat('MMM d, h:mm a').format(timestamp.toLocal());
   }
 }
