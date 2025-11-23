@@ -23,7 +23,7 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
     final theme = Theme.of(context);
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.device.name),
+        title: Text(widget.device.displayName),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
@@ -58,10 +58,10 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(widget.device.location, style: theme.textTheme.bodyMedium),
+                            Text(widget.device.locationLabel, style: theme.textTheme.bodyMedium),
                             const SizedBox(height: 4),
                             Text(
-                              widget.device.name,
+                              widget.device.displayName,
                               style: theme.textTheme.headlineSmall,
                             ),
                           ],
