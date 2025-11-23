@@ -2,27 +2,23 @@ import 'package:flutter/material.dart';
 
 class ProfileDetails {
   const ProfileDetails({
-    required this.email,
-    required this.password,
-    required this.nickname,
+    required this.name,
+    this.password,
   });
 
-  final String email;
-  final String password;
-  final String nickname;
+  final String name;
+  final String? password;
 }
 
 class ProfileEditScreen extends StatefulWidget {
   const ProfileEditScreen({
     super.key,
     required this.initialEmail,
-    required this.initialPassword,
-    required this.initialNickname,
+    required this.initialName,
   });
 
   final String initialEmail;
-  final String initialPassword;
-  final String initialNickname;
+  final String initialName;
 
   @override
   State<ProfileEditScreen> createState() => _ProfileEditScreenState();
@@ -41,10 +37,9 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
   void initState() {
     super.initState();
     _emailController = TextEditingController(text: widget.initialEmail);
-    _passwordController = TextEditingController(text: widget.initialPassword);
-    _confirmPasswordController =
-        TextEditingController(text: widget.initialPassword);
-    _nicknameController = TextEditingController(text: widget.initialNickname);
+    _passwordController = TextEditingController();
+    _confirmPasswordController = TextEditingController();
+    _nicknameController = TextEditingController(text: widget.initialName);
   }
 
   @override
@@ -70,9 +65,9 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
 
     Navigator.of(context).pop(
       ProfileDetails(
-        email: _emailController.text.trim(),
-        password: _passwordController.text,
-        nickname: _nicknameController.text.trim(),
+        name: _nicknameController.text.trim(),
+        password:
+            _passwordController.text.isNotEmpty ? _passwordController.text : null,
       ),
     );
   }
@@ -117,6 +112,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                       prefixIcon: Icon(Icons.email_outlined),
                     ),
                     keyboardType: TextInputType.emailAddress,
+                    enabled: false,
                     validator: (value) {
                       if (value == null || value.isEmpty) {
                         return '이메일을 입력해주세요.';
@@ -131,7 +127,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                   TextFormField(
                     controller: _passwordController,
                     decoration: InputDecoration(
-                      labelText: '비밀번호',
+                      labelText: '새 비밀번호 (선택)',
                       prefixIcon: const Icon(Icons.lock_outline),
                       suffixIcon: IconButton(
                         icon: Icon(
@@ -148,10 +144,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                     ),
                     obscureText: _obscurePassword,
                     validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return '비밀번호를 입력해주세요.';
-                      }
-                      if (value.length < 8) {
+                      if (value != null && value.isNotEmpty && value.length < 8) {
                         return '비밀번호는 8자 이상이어야 합니다.';
                       }
                       return null;
@@ -161,7 +154,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                   TextFormField(
                     controller: _confirmPasswordController,
                     decoration: InputDecoration(
-                      labelText: '비밀번호 확인',
+                      labelText: '새 비밀번호 확인',
                       prefixIcon: const Icon(Icons.lock_reset_outlined),
                       suffixIcon: IconButton(
                         icon: Icon(
@@ -178,6 +171,9 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                     ),
                     obscureText: _obscureConfirmPassword,
                     validator: (value) {
+                      if (_passwordController.text.isEmpty) {
+                        return null;
+                      }
                       if (value == null || value.isEmpty) {
                         return '비밀번호를 다시 입력해주세요.';
                       }
