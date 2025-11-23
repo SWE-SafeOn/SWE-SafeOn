@@ -2,8 +2,8 @@ import pandas as pd
 import numpy as np
 
 # 파일 불러오기
-normal_df = pd.read_csv("normal_esp32_win10.csv")
-attack_df = pd.read_csv("esp32_attack.csv")
+normal_df = pd.read_csv("normal_esp32_ISO.csv")
+attack_df = pd.read_csv("esp32_attack_ISO.csv")
 
 # attack 데이터에서 무작위 18줄 추출
 attack_sample = attack_df.sample(n=19, random_state=42)
