@@ -1,18 +1,21 @@
 import 'package:flutter/material.dart';
 
+import '../models/user_session.dart';
+import '../services/safeon_api.dart';
 import '../theme/app_theme.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({
     super.key,
     required this.onLoginSuccess,
+    required this.apiClient,
     this.initialEmail = '',
     this.initialPassword = '',
     this.initialNickname = '',
   });
 
-  final void Function(String email, String password, String nickname)
-      onLoginSuccess;
+  final void Function(UserSession session, String password) onLoginSuccess;
+  final SafeOnApiClient apiClient;
   final String initialEmail;
   final String initialPassword;
   final String initialNickname;
@@ -31,6 +34,7 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _obscurePassword = true;
   bool _acceptTerms = false;
   String? _savedNickname;
+  bool _isLoading = false;
 
   @override
   void initState() {
@@ -79,7 +83,8 @@ class _LoginScreenState extends State<LoginScreen> {
     });
   }
 
-  void _submit() {
+  Future<void> _submit() async {
+    if (_isLoading) return;
     if (!_formKey.currentState!.validate()) {
       return;
     }
@@ -93,37 +98,64 @@ class _LoginScreenState extends State<LoginScreen> {
       return;
     }
 
-    if (_isLoginMode) {
-      final nickname = _savedNickname?.isNotEmpty == true
-          ? _savedNickname!
-          : widget.initialNickname.isNotEmpty
-              ? widget.initialNickname
-              : _deriveNicknameFromEmail(_emailController.text);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('로그인에 성공했어요!')),
-      );
-      _savedNickname = nickname;
-      widget.onLoginSuccess(
-        _emailController.text.trim(),
-        _passwordController.text,
-        nickname,
-      );
-    } else {
-      if (_passwordController.text != _confirmPasswordController.text) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('비밀번호가 일치하지 않습니다.')),
-        );
-        return;
-      }
+    setState(() => _isLoading = true);
 
-      _savedNickname = _nicknameController.text.trim();
+    try {
+      if (_isLoginMode) {
+        final token = await widget.apiClient.login(
+          email: _emailController.text.trim(),
+          password: _passwordController.text,
+        );
+
+        final profile = await widget.apiClient.fetchProfile(token);
+        _savedNickname = profile.name;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('로그인에 성공했어요!')),
+        );
+
+        widget.onLoginSuccess(
+          UserSession(token: token, profile: profile),
+          _passwordController.text,
+        );
+      } else {
+        if (_passwordController.text != _confirmPasswordController.text) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('비밀번호가 일치하지 않습니다.')),
+          );
+          return;
+        }
+
+        final nickname = _nicknameController.text.trim();
+
+        await widget.apiClient.signup(
+          email: _emailController.text.trim(),
+          password: _passwordController.text,
+          name: nickname.isNotEmpty
+              ? nickname
+              : _deriveNicknameFromEmail(_emailController.text),
+        );
+
+        _savedNickname = nickname;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('회원가입이 완료되었습니다. 로그인해주세요.')),
+        );
+        setState(() {
+          _isLoginMode = true;
+          _acceptTerms = false;
+        });
+      }
+    } on ApiException catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('회원가입이 완료되었습니다. 로그인해주세요.')),
+        SnackBar(content: Text(e.message)),
       );
-      setState(() {
-        _isLoginMode = true;
-        _acceptTerms = false;
-      });
+    } catch (_) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('요청 처리 중 오류가 발생했습니다.')),
+      );
+      } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
@@ -299,7 +331,16 @@ class _LoginScreenState extends State<LoginScreen> {
                                     borderRadius: BorderRadius.circular(16),
                                   ),
                                 ),
-                                child: Text(_isLoginMode ? '로그인' : '회원가입'),
+                                child: _isLoading
+                                    ? const SizedBox(
+                                        height: 20,
+                                        width: 20,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2.5,
+                                          valueColor: AlwaysStoppedAnimation(Colors.white),
+                                        ),
+                                      )
+                                    : Text(_isLoginMode ? '로그인' : '회원가입'),
                               ),
                               const SizedBox(height: 12),
                               TextButton(
