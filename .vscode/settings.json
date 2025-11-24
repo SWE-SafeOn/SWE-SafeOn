@@ -1,5 +1,6 @@
 {
     "cmake.sourceDirectory": "/Users/jeongjaemin/SWE-SafeOn/safeonapp/linux",
     "java.configuration.updateBuildConfiguration": "interactive",
-    "java.compile.nullAnalysis.mode": "automatic"
+    "java.compile.nullAnalysis.mode": "automatic",
+    "sqltools.connections": []
 }

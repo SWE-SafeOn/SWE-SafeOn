@@ -168,6 +168,48 @@ class SafeOnApiClient {
     );
   }
 
+  Future<List<SafeOnDevice>> fetchDiscoveredDevices(String token) async {
+    final response = await _httpClient.get(
+      _uri('/devices', {'discovered': 'false'}),
+      headers: _jsonHeaders(token: token),
+    );
+
+    final body = _decode(response);
+    if (response.statusCode == 200 && body['data'] != null) {
+      final devices = body['data'] as List<dynamic>? ?? [];
+      return devices
+          .map((item) =>
+              SafeOnDevice.fromDashboardJson(item as Map<String, dynamic>))
+          .toList();
+    }
+
+    throw ApiException(
+      _extractError(body) ?? '발견된 기기 목록을 불러올 수 없습니다.',
+      response.statusCode,
+    );
+  }
+
+  Future<SafeOnDevice> claimDevice({
+    required String token,
+    required String deviceId,
+  }) async {
+    final response = await _httpClient.post(
+      _uri('/devices/$deviceId/claim'),
+      headers: _jsonHeaders(token: token),
+    );
+
+    final body = _decode(response);
+    if (response.statusCode == 200 && body['data'] != null) {
+      return SafeOnDevice.fromDashboardJson(
+          body['data'] as Map<String, dynamic>);
+    }
+
+    throw ApiException(
+      _extractError(body) ?? '기기 등록에 실패했습니다.',
+      response.statusCode,
+    );
+  }
+
   Future<List<SafeOnAlert>> fetchRecentAlerts(String token, {int? limit}) async {
     final response = await _httpClient.get(
       _uri('/dashboard/alerts', limit != null ? {'limit': '$limit'} : null),
