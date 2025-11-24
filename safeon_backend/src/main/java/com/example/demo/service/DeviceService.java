@@ -59,9 +59,7 @@ public class DeviceService {
     @Transactional
     public DeviceResponseDto createDiscoveredDevice(DeviceDiscoveryRequestDto request) {
         Device device = Device.create(
-                request.getVendor(),
                 request.getIp(),
-                request.getMacAddr(),
                 false,
                 OffsetDateTime.now()
         );
@@ -82,7 +80,7 @@ public class DeviceService {
 
         userDeviceRepository.findByDeviceDeviceIdAndUserUserId(deviceUuid, userId)
                 .orElseGet(() -> userDeviceRepository.save(
-                        UserDevice.create(user, device, device.getVendor(), OffsetDateTime.now())
+                        UserDevice.create(user, device, null, OffsetDateTime.now())
                 ));
 
         return DeviceResponseDto.from(device, userId);
