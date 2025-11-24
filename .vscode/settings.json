@@ -2,5 +2,16 @@
     "cmake.sourceDirectory": "/Users/jeongjaemin/SWE-SafeOn/safeonapp/linux",
     "java.configuration.updateBuildConfiguration": "interactive",
     "java.compile.nullAnalysis.mode": "automatic",
-    "sqltools.connections": []
+    "sqltools.connections": [
+        {
+            "name": "SafeOn Local Postgres",
+            "driver": "PostgreSQL",
+            "previewLimit": 50,
+            "server": "localhost",
+            "port": 5432,
+            "database": "safeon",
+            "username": "safeon",
+            "password": "0987"
+        }
+    ]
 }
