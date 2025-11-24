@@ -149,10 +149,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
   }
 
-  Future<void> _openQrAddDeviceSheet() async {
-    final scaffoldMessenger = ScaffoldMessenger.of(context);
-
-    await showModalBottomSheet<void>(
+  Future<void> _openDiscoveredDevicesSheet() async {
+    final claimedDevice = await showModalBottomSheet<SafeOnDevice>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
@@ -161,21 +159,23 @@ class _DashboardScreenState extends State<DashboardScreen> {
           padding: EdgeInsets.only(
             bottom: MediaQuery.of(context).viewInsets.bottom,
           ),
-          child: _QrAddDeviceSheet(
-            onStartScan: () {
-              Navigator.of(sheetContext).pop();
-              scaffoldMessenger.showSnackBar(
-                const SnackBar(
-                  content: Text(
-                    'QR 기반 디바이스 추가 기능을 곧 제공할 예정입니다.',
-                  ),
-                ),
-              );
-            },
+          child: _DiscoveredDeviceSheet(
+            apiClient: widget.apiClient,
+            token: widget.session.token,
           ),
         );
       },
     );
+
+    if (claimedDevice != null && mounted) {
+      await _loadDashboard();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('${claimedDevice.displayName} 기기를 등록했어요.'),
+        ),
+      );
+    }
   }
 
   @override
@@ -199,7 +199,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ),
         actions: [
           IconButton(
-            onPressed: _openQrAddDeviceSheet,
+            onPressed: _openDiscoveredDevicesSheet,
             icon: const Icon(Icons.add_rounded),
             tooltip: 'Add device',
           ),
@@ -232,30 +232,30 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ],
         ),
       ),
-        bottomNavigationBar: BottomNavigationBar(
-          currentIndex: _selectedIndex,
-          onTap: (index) => setState(() => _selectedIndex = index),
-          items: const [
-            BottomNavigationBarItem(
-              icon: Icon(Icons.home_outlined),
-              label: 'Home',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.warning_amber_rounded),
-              label: 'Alerts',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.devices_other_outlined),
-              label: 'Devices',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.person_outline),
-              label: 'Profile',
-            ),
-          ],
-        ),
-      );
-    }
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: _selectedIndex,
+        onTap: (index) => setState(() => _selectedIndex = index),
+        items: const [
+          BottomNavigationBarItem(
+            icon: Icon(Icons.home_outlined),
+            label: 'Home',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.warning_amber_rounded),
+            label: 'Alerts',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.devices_other_outlined),
+            label: 'Devices',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.person_outline),
+            label: 'Profile',
+          ),
+        ],
+      ),
+    );
+  }
 
   Widget _buildHomeTab(BuildContext context) {
     if (_isLoading) {
@@ -870,12 +870,69 @@ class _MotionSensitivitySelector extends StatelessWidget {
   }
 }
 
-class _QrAddDeviceSheet extends StatelessWidget {
-  const _QrAddDeviceSheet({
-    required this.onStartScan,
+class _DiscoveredDeviceSheet extends StatefulWidget {
+  const _DiscoveredDeviceSheet({
+    required this.apiClient,
+    required this.token,
   });
 
-  final VoidCallback onStartScan;
+  final SafeOnApiClient apiClient;
+  final String token;
+
+  @override
+  State<_DiscoveredDeviceSheet> createState() => _DiscoveredDeviceSheetState();
+}
+
+class _DiscoveredDeviceSheetState extends State<_DiscoveredDeviceSheet> {
+  late Future<List<SafeOnDevice>> _discoveredDevicesFuture;
+  final Set<String> _claimingDeviceIds = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _discoveredDevicesFuture =
+        widget.apiClient.fetchDiscoveredDevices(widget.token);
+  }
+
+  void _retryFetch() {
+    setState(() {
+      _discoveredDevicesFuture =
+          widget.apiClient.fetchDiscoveredDevices(widget.token);
+    });
+  }
+
+  Future<void> _claimDevice(SafeOnDevice device) async {
+    if (_claimingDeviceIds.contains(device.id)) return;
+
+    setState(() {
+      _claimingDeviceIds.add(device.id);
+    });
+
+    try {
+      final claimed = await widget.apiClient.claimDevice(
+        token: widget.token,
+        deviceId: device.id,
+      );
+      if (!mounted) return;
+      Navigator.of(context).pop(claimed);
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.message)),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('기기 등록에 실패했습니다. 다시 시도해주세요.')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _claimingDeviceIds.remove(device.id);
+        });
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -898,71 +955,77 @@ class _QrAddDeviceSheet extends StatelessWidget {
         top: false,
         child: Padding(
           padding: const EdgeInsets.fromLTRB(24, 28, 24, 24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Container(
-                  width: 48,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: colorScheme.onSurface.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(2),
+          child: SizedBox(
+            height: MediaQuery.of(context).size.height * 0.7,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 48,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: colorScheme.onSurface.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
                   ),
                 ),
-              ),
               const SizedBox(height: 16),
               Text(
-                'Scan QR code',
+                '새로 발견된 기기',
                 style: theme.textTheme.titleLarge?.copyWith(
                   fontWeight: FontWeight.w600,
                 ),
               ),
               const SizedBox(height: 4),
               Text(
-                'Place the device\'s QR code inside the frame to begin pairing.',
+                'Hub Agent에서 감지된 기기를 선택해 등록하세요.',
                 style: theme.textTheme.bodyMedium?.copyWith(
                   color: SafeOnColors.textSecondary,
                 ),
               ),
-              const SizedBox(height: 24),
-              const _QrInstructionTile(
-                icon: Icons.qr_code_scanner,
-                title: 'Find the pairing label',
-                description:
-                    'Look for the SafeOn QR code sticker on the device or packaging.',
-              ),
-              const SizedBox(height: 16),
-              const _QrInstructionTile(
-                icon: Icons.light_mode_outlined,
-                title: 'Ensure good lighting',
-                description:
-                    'Bright, glare-free lighting helps the camera read the code quickly.',
-              ),
-              const SizedBox(height: 16),
-              const _QrInstructionTile(
-                icon: Icons.wifi,
-                title: 'Stay near your hub',
-                description:
-                    'Remain close to your SafeOn hub for a seamless hand-off.',
-              ),
-              const SizedBox(height: 28),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  onPressed: onStartScan,
-                  icon: const Icon(Icons.play_arrow_rounded),
-                  label: const Text('Start QR scan'),
-                  style: ElevatedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
+              const SizedBox(height: 20),
+                Expanded(
+                  child: FutureBuilder<List<SafeOnDevice>>(
+                    future: _discoveredDevicesFuture,
+                    builder: (context, snapshot) {
+                      if (snapshot.connectionState ==
+                          ConnectionState.waiting) {
+                        return const Center(
+                          child: CircularProgressIndicator(),
+                        );
+                      }
+
+                      if (snapshot.hasError) {
+                        return _DiscoveredDeviceError(
+                          onRetry: _retryFetch,
+                        );
+                      }
+
+                      final devices = snapshot.data ?? [];
+                      if (devices.isEmpty) {
+                        return _DiscoveredDeviceEmptyState(onRetry: _retryFetch);
+                      }
+
+                      return ListView.separated(
+                        itemCount: devices.length,
+                        separatorBuilder: (_, __) => const SizedBox(height: 14),
+                        itemBuilder: (context, index) {
+                          final device = devices[index];
+                          final isClaiming =
+                              _claimingDeviceIds.contains(device.id);
+                          return _DiscoveredDeviceTile(
+                            device: device,
+                            isClaiming: isClaiming,
+                            onClaim: () => _claimDevice(device),
+                          );
+                        },
+                      );
+                    },
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -970,53 +1033,220 @@ class _QrAddDeviceSheet extends StatelessWidget {
   }
 }
 
-class _QrInstructionTile extends StatelessWidget {
-  const _QrInstructionTile({
-    required this.icon,
-    required this.title,
-    required this.description,
+class _DiscoveredDeviceTile extends StatelessWidget {
+  const _DiscoveredDeviceTile({
+    required this.device,
+    required this.onClaim,
+    required this.isClaiming,
   });
 
-  final IconData icon;
-  final String title;
-  final String description;
+  final SafeOnDevice device;
+  final VoidCallback onClaim;
+  final bool isClaiming;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    return Container(
+      decoration: BoxDecoration(
+        color: SafeOnColors.surface,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 16,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                CircleAvatar(
+                  radius: 24,
+                  backgroundColor: SafeOnColors.primary.withOpacity(0.12),
+                  child: Icon(
+                    Icons.sensors,
+                    color: SafeOnColors.primary,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        device.displayName,
+                        style: theme.textTheme.titleMedium,
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Vendor: ${device.vendor}',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: SafeOnColors.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                _DeviceMetaChip(icon: Icons.language, label: device.ip),
+                const SizedBox(width: 8),
+                _DeviceMetaChip(icon: Icons.qr_code, label: device.macAddr),
+              ],
+            ),
+            const SizedBox(height: 14),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: isClaiming ? null : onClaim,
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: isClaiming
+                    ? const SizedBox(
+                        height: 18,
+                        width: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Text('등록하기'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _DiscoveredDeviceEmptyState extends StatelessWidget {
+  const _DiscoveredDeviceEmptyState({required this.onRetry});
+
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
       children: [
         Container(
-          height: 44,
-          width: 44,
+          padding: const EdgeInsets.all(18),
           decoration: BoxDecoration(
-            color: SafeOnColors.primary.withOpacity(0.1),
-            borderRadius: BorderRadius.circular(12),
+            color: SafeOnColors.primary.withOpacity(0.08),
+            shape: BoxShape.circle,
           ),
-          child: Icon(icon, color: SafeOnColors.primary),
+          child: const Icon(
+            Icons.hub,
+            size: 32,
+            color: SafeOnColors.primary,
+          ),
         ),
-        const SizedBox(width: 16),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                title,
-                style: theme.textTheme.titleMedium,
-              ),
-              const SizedBox(height: 4),
-              Text(
-                description,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: SafeOnColors.textSecondary,
-                ),
-              ),
-            ],
+        const SizedBox(height: 12),
+        Text(
+          '허브가 새로운 기기를 찾지 못했어요.',
+          style: theme.textTheme.titleMedium,
+        ),
+        const SizedBox(height: 6),
+        Text(
+          'Hub Agent가 새 기기를 감지하면 여기에 표시됩니다.',
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: SafeOnColors.textSecondary,
           ),
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: 18),
+        OutlinedButton.icon(
+          onPressed: onRetry,
+          icon: const Icon(Icons.refresh_rounded),
+          label: const Text('새로고침'),
         ),
       ],
+    );
+  }
+}
+
+class _DiscoveredDeviceError extends StatelessWidget {
+  const _DiscoveredDeviceError({required this.onRetry});
+
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        const Icon(
+          Icons.error_outline,
+          color: SafeOnColors.danger,
+          size: 36,
+        ),
+        const SizedBox(height: 8),
+        Text(
+          '발견된 기기를 불러올 수 없습니다.',
+          style: theme.textTheme.titleMedium,
+        ),
+        const SizedBox(height: 4),
+        Text(
+          '네트워크 연결을 확인한 후 다시 시도해주세요.',
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: SafeOnColors.textSecondary,
+          ),
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: 16),
+        OutlinedButton.icon(
+          onPressed: onRetry,
+          icon: const Icon(Icons.refresh),
+          label: const Text('다시 시도'),
+        ),
+      ],
+    );
+  }
+}
+class _DeviceMetaChip extends StatelessWidget {
+  const _DeviceMetaChip({required this.icon, required this.label});
+
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: SafeOnColors.scaffold,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 16, color: SafeOnColors.textSecondary),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: SafeOnColors.textSecondary,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
