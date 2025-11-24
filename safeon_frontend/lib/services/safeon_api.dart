@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 import '../models/alert.dart';
@@ -20,8 +21,9 @@ class ApiException implements Exception {
 class SafeOnApiClient {
   SafeOnApiClient({
     http.Client? httpClient,
-    this.baseUrl = 'http://localhost:8080',
-  }) : _httpClient = httpClient ?? http.Client();
+    String? baseUrl,
+  })  : baseUrl = _resolveBaseUrl(baseUrl),
+        _httpClient = httpClient ?? http.Client();
 
   final String baseUrl;
   final http.Client _httpClient;
@@ -34,6 +36,19 @@ class SafeOnApiClient {
       'Content-Type': 'application/json',
       if (token != null) 'Authorization': 'Bearer $token',
     };
+  }
+
+  static String _resolveBaseUrl(String? override) {
+    if (override != null && override.isNotEmpty) {
+      return override;
+    }
+
+    // Android 에뮬레이터에서는 호스트의 localhost를 10.0.2.2로 접근해야 한다.
+    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
+      return 'http://10.0.2.2:8080';
+    }
+
+    return 'http://localhost:8080';
   }
 
   Future<String> login({required String email, required String password}) async {
