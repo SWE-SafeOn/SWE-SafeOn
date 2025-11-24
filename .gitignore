@@ -80,3 +80,5 @@ safeon_backend/dist/
 safeon_backend/nbdist/
 safeon_backend/.nb-gradle/
 
+.env
+db/init.db

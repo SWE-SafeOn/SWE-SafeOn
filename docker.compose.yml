@@ -1,0 +1,22 @@
+# 실행방법
+# docker-compose up -d
+
+version: "3.9"
+
+services:
+  postgres:
+    image: timescale/timescaledb:2.14.1-pg15
+    container_name: safeon_postgres
+    restart: always
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "5432:5432"
+    volumes:
+      - safeon_pgdata:/var/lib/postgresql/data
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql
+
+volumes:
+  safeon_pgdata:
