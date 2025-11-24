@@ -18,13 +18,8 @@ public class Device {
     @GeneratedValue(generator = "uuid2")
     private UUID deviceId;
 
-    private String vendor;
-
     @Column(name = "ip_address")
     private String ip;
-
-    @Column(name = "mac_addr")
-    private String macAddr;
 
     @Column(name = "discovered")
     private Boolean discovered;
@@ -33,16 +28,12 @@ public class Device {
     private OffsetDateTime createdAt;
 
     public static Device create(
-            String vendor,
             String ip,
-            String macAddr,
             Boolean discovered,
             OffsetDateTime createdAt
     ) {
         Device device = new Device();
-        device.vendor = vendor;
         device.ip = ip;
-        device.macAddr = macAddr;
         device.discovered = discovered;
         device.createdAt = createdAt;
         return device;

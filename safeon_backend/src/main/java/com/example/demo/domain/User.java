@@ -28,7 +28,7 @@ public class User {
     private String name;
 
     @Column(name = "registered_at")
-    private OffsetDateTime registeredAt;
+    private OffsetDateTime registeredAt = OffsetDateTime.now();
 
     public static User create(String email, String password, String name, OffsetDateTime registeredAt) {
         User user = new User();

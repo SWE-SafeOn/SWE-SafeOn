@@ -28,8 +28,6 @@ public class UserDevice {
     @JoinColumn(name = "device_id")
     private Device device;
 
-    private String label;
-
     @Column(name = "linked_at")
     private OffsetDateTime linkedAt;
 
@@ -37,13 +35,8 @@ public class UserDevice {
         UserDevice userDevice = new UserDevice();
         userDevice.user = user;
         userDevice.device = device;
-        userDevice.label = label;
         userDevice.linkedAt = linkedAt;
         return userDevice;
-    }
-
-    public void updateLabel(String label) {
-        this.label = label;
     }
 
     public void ensureOwner(UUID userId) {
