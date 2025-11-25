@@ -358,13 +358,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
           const SizedBox(height: 16),
           if (_devices.isEmpty)
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: SafeOnColors.surface,
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: const Text('연결된 기기가 없습니다. 허브에서 기기를 등록해주세요.'),
+            _buildInlineEmptyState(
+              context: context,
+              icon: Icons.devices_other_outlined,
+              title: '아직 연결된 기기가 없어요',
+              description: '허브에서 기기를 등록하면 기기 상태를 빠르게 확인할 수 있어요.',
+              actionLabel: '허브에서 등록하기',
+              onActionTap: () => setState(() => _selectedIndex = 2),
             )
           else
             ..._devices
@@ -386,13 +386,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
           const SizedBox(height: 12),
           if (_alerts.isEmpty)
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: SafeOnColors.surface,
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: const Text('최근 알림이 없습니다.'),
+            _buildInlineEmptyState(
+              context: context,
+              icon: Icons.notifications_none_outlined,
+              title: '최근 알림이 없어요',
+              description: '새로운 알림이 들어오면 이곳에서 바로 확인할 수 있어요.',
+              actionLabel: '알림 기록 보기',
+              onActionTap: () => setState(() => _selectedIndex = 1),
             )
           else
             ..._alerts.map((alert) => AlertTile(alert: alert)).toList(),
@@ -659,6 +659,71 @@ class _DashboardScreenState extends State<DashboardScreen> {
           child: Text(message),
         ),
       ],
+    );
+  }
+
+  Widget _buildInlineEmptyState({
+    required BuildContext context,
+    required IconData icon,
+    required String title,
+    required String description,
+    String? actionLabel,
+    VoidCallback? onActionTap,
+  }) {
+    final theme = Theme.of(context);
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: SafeOnColors.surface,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: SafeOnColors.primary.withOpacity(0.08),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, color: SafeOnColors.primary, size: 22),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                    color: SafeOnColors.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  description,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: SafeOnColors.textSecondary,
+                  ),
+                ),
+                if (actionLabel != null && onActionTap != null) ...[
+                  const SizedBox(height: 10),
+                  TextButton(
+                    onPressed: onActionTap,
+                    style: TextButton.styleFrom(
+                      padding: EdgeInsets.zero,
+                      foregroundColor: SafeOnColors.primary,
+                    ),
+                    child: Text(actionLabel),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 
