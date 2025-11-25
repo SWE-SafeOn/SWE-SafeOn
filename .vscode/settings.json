@@ -12,6 +12,17 @@
             "database": "safeon",
             "username": "safeon",
             "password": "0987"
+        },
+        {
+            "ssh": "Disabled",
+            "previewLimit": 50,
+            "server": "localhost",
+            "port": 5432,
+            "askForPassword": true,
+            "driver": "PostgreSQL",
+            "name": "safeon",
+            "database": "safeon",
+            "username": "safeon"
         }
     ]
 }
