@@ -172,7 +172,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('${claimedDevice.displayName} 기기를 등록했어요'),
+          content: Text('${claimedDevice.displayName} 기기를 등록했어요.'),
         ),
       );
     }
