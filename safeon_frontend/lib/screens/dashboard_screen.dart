@@ -986,7 +986,7 @@ class _DiscoveredDeviceSheetState extends State<_DiscoveredDeviceSheet> {
     try {
       final claimed = await widget.apiClient.claimDevice(
         token: widget.token,
-        deviceId: device.id,
+        device: device,
       );
       if (!mounted) return;
       Navigator.of(context).pop(claimed);
@@ -1166,7 +1166,7 @@ class _DiscoveredDeviceTile extends StatelessWidget {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        'Vendor: ${device.vendor}',
+                        'MAC: ${device.macAddress}',
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: SafeOnColors.textSecondary,
                         ),
@@ -1181,7 +1181,7 @@ class _DiscoveredDeviceTile extends StatelessWidget {
               children: [
                 _DeviceMetaChip(icon: Icons.language, label: device.ip),
                 const SizedBox(width: 8),
-                _DeviceMetaChip(icon: Icons.qr_code, label: device.macAddr),
+                _DeviceMetaChip(icon: Icons.qr_code, label: device.macAddress),
               ],
             ),
             const SizedBox(height: 14),

@@ -1,9 +1,9 @@
 class SafeOnDevice {
   const SafeOnDevice({
     required this.id,
-    required this.vendor,
+    required this.name,
     required this.ip,
-    required this.macAddr,
+    required this.macAddress,
     required this.discovered,
     required this.label,
     this.createdAt,
@@ -11,20 +11,23 @@ class SafeOnDevice {
   });
 
   final String id;
-  final String vendor;
+  final String name;
   final String ip;
-  final String macAddr;
+  final String macAddress;
   final bool discovered;
   final String label;
   final DateTime? createdAt;
   final DateTime? linkedAt;
 
   factory SafeOnDevice.fromDashboardJson(Map<String, dynamic> json) {
+    final mac = json['macAddress'] ?? json['macAddr'];
+    final deviceName = json['name'] ?? json['label'] ?? json['vendor'];
+    
     return SafeOnDevice(
       id: json['id'] as String? ?? '',
-      vendor: json['vendor'] as String? ?? 'Unknown vendor',
+      name: deviceName as String? ?? 'SafeOn Device',
       ip: json['ip'] as String? ?? '—',
-      macAddr: json['macAddr'] as String? ?? '—',
+      macAddress: mac as String? ?? '—',
       discovered: json['discovered'] as bool? ?? false,
       createdAt: json['createdAt'] != null
           ? DateTime.tryParse(json['createdAt'] as String)
@@ -32,11 +35,10 @@ class SafeOnDevice {
       linkedAt: json['linkedAt'] != null
           ? DateTime.tryParse(json['linkedAt'] as String)
           : null,
-      label: json['label'] as String? ?? 'SafeOn Device',
     );
   }
 
-  String get displayName => label.isNotEmpty ? label : vendor;
+  String get displayName => name.isNotEmpty ? name : 'SafeOn Device';
 
   String get locationLabel => ip.isNotEmpty ? 'IP: $ip' : 'IP unavailable';
 

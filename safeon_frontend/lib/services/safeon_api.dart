@@ -191,11 +191,16 @@ class SafeOnApiClient {
 
   Future<SafeOnDevice> claimDevice({
     required String token,
-    required String deviceId,
+    required SafeOnDevice device,
   }) async {
     final response = await _httpClient.post(
-      _uri('/devices/$deviceId/claim'),
+      _uri('/devices/${device.id}/claim'),
       headers: _jsonHeaders(token: token),
+      body: jsonEncode({
+        'macAddress': device.macAddress,
+        'name': device.name,
+        'ip': device.ip,
+      }),
     );
 
     final body = _decode(response);
