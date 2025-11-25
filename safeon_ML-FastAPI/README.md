@@ -33,6 +33,7 @@ safeon_ML-FastAPI/
 
 - `MODEL_PATH` (optional): filesystem path to a serialized model artifact. If omitted, the API stays in **dummy** mode and returns deterministic placeholder predictions so integration work can continue before the dataset/model is ready.
 - `ALLOW_DUMMY` (optional, default: `true`): when set to `false`, requests will fail with `503` if `MODEL_PATH` is not provided or cannot be loaded.
+- `DATABASE_URL` (optional): PostgreSQL URL for persisting inference scores (defaults to `postgresql://safeon:0987@localhost:5432/safeon`).
 
 The `/health` endpoint reports whether a model is loaded and whether the service is running in `model` or `dummy` mode.
 
@@ -82,6 +83,16 @@ bounded numeric space, protocol strings are mapped to floats (TCP=1.0,
 UDP=0.5, ICMP=0.2, else 0.0), and duration falls back to `end_time - start_time`
 if the provided `duration` is zero. Swap this encoding for your model-specific
 preprocessing as needed.
+
+## Training with the bundled dataset
+
+```
+python -m app.train --dataset ../datasets/esp32-cam/esp32_500_dataset.csv
+```
+
+Artifacts (encoders, scaler, IsolationForest, Transformer autoencoder) are
+written to `safeon_ML-FastAPI/models`. Subsequent `/predict` calls will load
+these artifacts automatically and store scores in the configured database.
 
 ## Integration notes
 

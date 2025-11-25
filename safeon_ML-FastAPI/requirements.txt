@@ -1,2 +1,9 @@
 fastapi>=0.111.0
 uvicorn[standard]>=0.29.0
+pandas>=2.2.2
+numpy>=1.26.4
+scikit-learn>=1.4.2
+joblib>=1.4.2
+torch>=2.2.0
+sqlalchemy>=2.0.29
+psycopg2-binary>=2.9.9
