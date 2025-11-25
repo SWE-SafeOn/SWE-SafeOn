@@ -10,6 +10,7 @@ import java.util.UUID;
 public record DeviceResponseDto(
         String id,
         String userId,
+        String macAddress,
         String name,
         String ip,
         Boolean discovered,
@@ -33,6 +34,7 @@ public record DeviceResponseDto(
         return DeviceResponseDto.builder()
                 .id(device.getDeviceId() != null ? device.getDeviceId().toString() : null)
                 .userId(userId != null ? userId.toString() : null)
+                .macAddress(device.getMacAddress())
                 .name(device.getName())
                 .ip(device.getIp())
                 .discovered(device.getDiscovered())

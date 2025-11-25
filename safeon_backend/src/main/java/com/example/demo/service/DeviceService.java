@@ -59,6 +59,7 @@ public class DeviceService {
     @Transactional
     public DeviceResponseDto createDiscoveredDevice(DeviceDiscoveryRequestDto request) {
         Device device = Device.create(
+                request.getMacAddress(),
                 request.getName(),
                 request.getIp(),
                 false,
