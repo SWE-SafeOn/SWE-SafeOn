@@ -4,7 +4,7 @@ import os
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 from uuid import UUID, uuid4
 
 import joblib
@@ -396,7 +396,7 @@ class ModelService:
 
         self.model_loaded = True
 
-    def _create_sequences(self, data: np.ndarray, labels: np.ndarray, seq_len: int) -> (np.ndarray, np.ndarray):
+    def _create_sequences(self, data: np.ndarray, labels: np.ndarray, seq_len: int) -> Tuple[np.ndarray, np.ndarray]:
         X, y = [], []
         for i in range(len(data) - seq_len):
             X.append(data[i : i + seq_len])
