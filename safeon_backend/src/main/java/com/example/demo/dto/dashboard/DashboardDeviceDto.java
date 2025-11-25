@@ -6,6 +6,7 @@ import lombok.Builder;
 @Builder
 public record DashboardDeviceDto(
         String id,
+        String name,
         String ip,
         Boolean discovered,
         String createdAt,
@@ -15,6 +16,7 @@ public record DashboardDeviceDto(
         var device = userDevice.getDevice();
         return DashboardDeviceDto.builder()
                 .id(device.getDeviceId() != null ? device.getDeviceId().toString() : null)
+                .name(device.getName())
                 .ip(device.getIp())
                 .discovered(device.getDiscovered())
                 .createdAt(device.getCreatedAt() != null ? device.getCreatedAt().toString() : null)

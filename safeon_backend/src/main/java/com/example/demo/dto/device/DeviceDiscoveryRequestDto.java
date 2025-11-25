@@ -9,9 +9,13 @@ import lombok.NoArgsConstructor;
 public class DeviceDiscoveryRequestDto {
 
     @NotBlank
+    private String name;
+
+    @NotBlank
     private String ip;
 
-    public DeviceDiscoveryRequestDto(String ip) {
+    public DeviceDiscoveryRequestDto(String name, String ip) {
+        this.name = name;
         this.ip = ip;
     }
 }
