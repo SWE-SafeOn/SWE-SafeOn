@@ -1,150 +1,176 @@
-"""Model service abstraction used by the FastAPI endpoints.
+import joblib
+import numpy as np
+import pandas as pd
+import torch
+import torch.nn as nn
 
-This module keeps model-loading and inference logic separate from the
-HTTP layer so it can be swapped once a trained model is available.
-"""
+# ============================================================
+# Transformer Autoencoder (train.py와 동일 구조)
+# ============================================================
+class TransformerAE(nn.Module):
+    def __init__(self, num_features, seq_len, emb_dim=64, nhead=4, num_layers=2):
+        super().__init__()
 
-import os
-from ipaddress import ip_address
-from pathlib import Path
-from typing import List, Optional
+        # 같은 이름 = 같은 구조 = weight load 성공
+        self.input_layer = nn.Linear(num_features, emb_dim)
 
-from pydantic import BaseModel, Field, IPvAnyAddress
+        encoder_layer = nn.TransformerEncoderLayer(
+            d_model=emb_dim, nhead=nhead, batch_first=True
+        )
+        self.encoder = nn.TransformerEncoder(encoder_layer, num_layers=num_layers)
 
+        decoder_layer = nn.TransformerDecoderLayer(
+            d_model=emb_dim, nhead=nhead, batch_first=True
+        )
+        self.decoder = nn.TransformerDecoder(decoder_layer, num_layers=num_layers)
 
-class FlowFeatures(BaseModel):
-    """Structured network flow features aligned with the expected dataset."""
+        self.output_layer = nn.Linear(emb_dim, num_features)
 
-    src_ip: IPvAnyAddress = Field(..., description="Source IP address")
-    dst_ip: IPvAnyAddress = Field(..., description="Destination IP address")
-    src_port: int = Field(..., ge=0, le=65535, description="Source port")
-    dst_port: int = Field(..., ge=0, le=65535, description="Destination port")
-    proto: str = Field(..., description="Transport protocol (e.g., TCP/UDP/ICMP)")
-    packet_count: int = Field(..., ge=0, description="Total packets observed")
-    byte_count: int = Field(..., ge=0, description="Total bytes observed")
-    start_time: float = Field(..., description="Flow start timestamp (epoch seconds)")
-    end_time: float = Field(..., description="Flow end timestamp (epoch seconds)")
-    duration: float = Field(..., ge=0, description="Reported flow duration in seconds")
-    pps: float = Field(..., ge=0, description="Packets per second")
-    bps: float = Field(..., ge=0, description="Bytes per second")
-
-    def computed_duration(self) -> float:
-        """Return a non-negative duration, falling back to end-start if needed."""
-
-        if self.duration > 0:
-            return self.duration
-        return max(self.end_time - self.start_time, 0.0)
-
-    def encode(self) -> List[float]:
-        """Convert the flow into a numeric vector for model consumption."""
-
-        proto_map = {"TCP": 1.0, "UDP": 0.5, "ICMP": 0.2}
-        proto_value = proto_map.get(self.proto.upper(), 0.0)
-
-        # Hash IPs into a bounded numeric space so models can ingest them as features
-        src_ip_value = (hash(self._ip_to_int(self.src_ip)) % 2048) / 2048
-        dst_ip_value = (hash(self._ip_to_int(self.dst_ip)) % 2048) / 2048
-
-        return [
-            src_ip_value,
-            dst_ip_value,
-            float(self.src_port),
-            float(self.dst_port),
-            proto_value,
-            float(self.packet_count),
-            float(self.byte_count),
-            self.computed_duration(),
-            float(self.pps),
-            float(self.bps),
-        ]
-
-    @staticmethod
-    def _ip_to_int(address: IPvAnyAddress) -> int:
-        """Convert IPv4/IPv6 to a stable integer representation."""
-
-        return int(ip_address(str(address)))
+    def forward(self, x):
+        x_emb = self.input_layer(x)
+        enc = self.encoder(x_emb)
+        dec = self.decoder(x_emb, enc)  # IMPORTANT: (tgt=x_emb, memory=enc)
+        out = self.output_layer(dec)
+        return out
 
 
-class ModelService:
-    """Simple service wrapper for loading and invoking an ML model.
+# ============================================================
+# 1. 모델/인코더 불러오기
+# ============================================================
+print("Using device:", "mps" if torch.backends.mps.is_available() else "cpu")
+device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
 
-    The default behavior is "dummy" mode, which returns deterministic
-    placeholder predictions so the API can be exercised before a trained
-    model exists. Once a real model artifact is ready, provide its path
-    via ``MODEL_PATH`` (or pass ``model_path`` explicitly) and replace the
-    ``_load_model`` and ``_predict_with_model`` methods as needed.
-    """
+# LabelEncoders
+enc_src_ip = joblib.load("models/enc_src_ip.pkl")
+enc_dst_ip = joblib.load("models/enc_dst_ip.pkl")
+enc_proto  = joblib.load("models/enc_proto.pkl")
 
-    def __init__(self, model_path: Optional[Path] = None, allow_dummy: bool = True):
-        self.model_path = model_path
-        self.allow_dummy = allow_dummy
-        self.model = self._load_model(model_path) if model_path else None
+# Scaler
+scaler = joblib.load("models/scaler.pkl")
 
-    @classmethod
-    def from_env(cls) -> "ModelService":
-        """Instantiate from environment variables.
+# Isolation Forest
+iso = joblib.load("models/isolation_forest.pkl")
 
-        - ``MODEL_PATH``: optional file path to a serialized model artifact.
-        - ``ALLOW_DUMMY``: when set to ``"false"`` (case-insensitive), dummy
-          mode is disabled and missing models will trigger errors.
-        """
+# Autoencoder (load after building same structure)
+NUM_FEATURES = 10
+SEQ_LEN = 20
 
-        model_env = os.getenv("MODEL_PATH")
-        model_path = Path(model_env) if model_env else None
-        allow_dummy = os.getenv("ALLOW_DUMMY", "true").lower() != "false"
-        return cls(model_path=model_path, allow_dummy=allow_dummy)
+transformer = TransformerAE(num_features=NUM_FEATURES, seq_len=SEQ_LEN).to(device)
+transformer.load_state_dict(torch.load("models/transformer_ae.pth", map_location=device))
+transformer.eval()
 
-    @property
-    def model_loaded(self) -> bool:
-        """Return whether a real model artifact is loaded."""
 
-        return self.model is not None
+# ============================================================
+# 2. 최근 패킷을 쌓아 시퀀스 만드는 버퍼
+# ============================================================
+packet_buffer = []   # 실시간 데이터 시퀀스 누적
+INTRUSION_COUNT = 0  # 누적 이상치 건수 카운트
 
-    def predict(self, flow: FlowFeatures) -> tuple[str, float]:
-        """Return a label and confidence for the provided flow features."""
 
-        feature_vector = flow.encode()
+# ============================================================
+# 3. 패킷 전처리 함수
+# ============================================================
+def preprocess_packet(row: dict):
 
-        if not feature_vector:
-            raise ValueError("Feature list cannot be empty")
+    df = pd.DataFrame([row])
 
-        if self.model is not None:
-            return self._predict_with_model(feature_vector)
+    # LabelEncoding
+    df["src_ip"] = enc_src_ip.transform(df["src_ip"])
+    df["dst_ip"] = enc_dst_ip.transform(df["dst_ip"])
+    df["proto"]  = enc_proto.transform(df["proto"])
+  
+    df = df[[
+        "src_ip", "dst_ip",
+        "src_port", "dst_port",
+        "proto",
+        "packet_count", "byte_count",
+        "duration", "pps", "bps"
+    ]]  
 
-        if not self.allow_dummy:
-            raise RuntimeError("Model not loaded and dummy mode is disabled")
+    # Scaling
+    scaled = scaler.transform(df)
 
-        return self._dummy_predict(feature_vector)
+    return scaled[0]
 
-    def _load_model(self, model_path: Path):
-        """Load the serialized model artifact.
 
-        Replace this stub with framework-specific loading logic, e.g.
-        ``torch.load`` or ``joblib.load``. The current implementation only
-        checks that the file exists to provide a predictable failure mode.
-        """
+# ============================================================
+# 4. 실시간 탐지 함수
+# ============================================================
+def detect_intrusion(raw_packet: dict):
+    global INTRUSION_COUNT, packet_buffer
 
-        if not model_path.exists():
-            raise FileNotFoundError(f"Model file not found at {model_path}")
-        # TODO: replace with actual model load (e.g., torch.load, joblib.load)
-        return "dummy_model_placeholder"
+    # -------------------------
+    # 1) 전처리
+    # -------------------------
+    vec = preprocess_packet(raw_packet)
+    packet_buffer.append(vec)
 
-    def _predict_with_model(self, features: List[float]) -> tuple[str, float]:
-        """Run inference using the loaded model.
+    if len(packet_buffer) < SEQ_LEN:
+        return None  # 아직 시퀀스 부족 → 판단 불가
 
-        Replace the body with real inference once the model is integrated.
-        """
+    if len(packet_buffer) > SEQ_LEN:
+        packet_buffer = packet_buffer[-SEQ_LEN:]
 
-        score = 0.5 + (sum(features) % 1) / 2
-        score = min(0.99, score)
-        label = "safe" if score >= 0.5 else "unsafe"
-        return label, round(score, 4)
+    seq = np.array(packet_buffer).reshape(1, SEQ_LEN, NUM_FEATURES)
 
-    def _dummy_predict(self, features: List[float]) -> tuple[str, float]:
-        """Return deterministic placeholder predictions for early testing."""
+    # -------------------------
+    # 2) IsolationForest anomaly score
+    # -------------------------
+    if_score = -iso.decision_function([vec])[0]
+    if_score = max(0, min(1, if_score))
 
-        checksum = sum(features)
-        score = 0.25 + (checksum % 0.5)
-        score = round(min(score, 0.99), 4)
-        label = "safe" if score >= 0.5 else "unsafe"
-        return label, score
+    # -------------------------
+    # 3) Transformer AE reconstruction error
+    # -------------------------
+    seq_t = torch.tensor(seq, dtype=torch.float32).to(device)
+    with torch.no_grad():
+        recon = transformer(seq_t)
+    ae_err = torch.mean((seq_t - recon) ** 2).item()
+    ae_err = min(1.0, ae_err * 10)
+
+    # -------------------------
+    # 4) 통합 스코어
+    # -------------------------
+    final = 0.5 * if_score + 0.5 * ae_err
+
+    # -------------------------
+    # 5) 이상 판정
+    # -------------------------
+    is_intrusion = final > 0.35  # 임계값 직접 조정 가능 뭘로 할지 안 정함
+
+    if is_intrusion:
+        INTRUSION_COUNT += 1
+
+    return {
+        "if_score": float(if_score),
+        "ae_error": float(ae_err),
+        "final_score": float(final),
+        "is_intrusion": bool(is_intrusion),
+        "intrusion_count": INTRUSION_COUNT,
+    }
+
+
+# ============================================================
+# 5. 테스트 예시 (정상 데이터 25개)
+# ============================================================
+print("\nTesting intrusion detection...")
+
+sample_df = pd.read_csv("data/normal_esp32_win10.csv").head(30)
+
+for i in range(len(sample_df)):
+    pkt = {
+        "src_ip":  sample_df.iloc[i]["src_ip"],
+        "dst_ip":  sample_df.iloc[i]["dst_ip"],
+        "proto":   sample_df.iloc[i]["proto"],
+        "src_port": sample_df.iloc[i]["src_port"],
+        "dst_port": sample_df.iloc[i]["dst_port"],
+        "packet_count": sample_df.iloc[i]["packet_count"],
+        "byte_count": sample_df.iloc[i]["byte_count"],
+        "duration": sample_df.iloc[i]["duration"],
+        "pps": sample_df.iloc[i]["pps"],
+        "bps": sample_df.iloc[i]["bps"],
+    }
+
+    result = detect_intrusion(pkt)
+    print(i, result)
+
