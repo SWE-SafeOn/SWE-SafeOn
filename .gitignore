@@ -65,7 +65,6 @@ safeon_frontend/android/app/release
 # Gradle
 safeon_backend/.gradle/
 safeon_backend/build/
-safeon_backend/gradle/
 safeon_backend/out/
 safeon_backend/bin/
 
