@@ -351,7 +351,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ],
           ),
           const SizedBox(height: 32),
-          const SectionHeader(title: 'Featured Devices', actionLabel: 'View all'),
+          SectionHeader(
+            title: 'Featured Devices',
+            actionLabel: 'View all',
+            onActionTap: () => setState(() => _selectedIndex = 2),
+          ),
           const SizedBox(height: 16),
           if (_devices.isEmpty)
             Container(
@@ -375,7 +379,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 )
                 .toList(),
           const SizedBox(height: 12),
-          const SectionHeader(title: 'Latest Alerts', actionLabel: 'See history'),
+          SectionHeader(
+            title: 'Latest Alerts',
+            actionLabel: 'See history',
+            onActionTap: () => setState(() => _selectedIndex = 1),
+          ),
           const SizedBox(height: 12),
           if (_alerts.isEmpty)
             Container(
