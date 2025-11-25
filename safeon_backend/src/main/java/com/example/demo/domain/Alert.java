@@ -3,6 +3,8 @@ package com.example.demo.domain;
 import com.example.demo.exception.AccessDeniedException;
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.time.OffsetDateTime;
 import java.util.UUID;
@@ -35,6 +37,7 @@ public class Alert {
     private String reason;
 
     @Column(columnDefinition = "jsonb")
+    @JdbcTypeCode(SqlTypes.JSON)
     private String evidence;
 
     private String status;
