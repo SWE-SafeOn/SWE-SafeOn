@@ -273,7 +273,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final lastAlertTime = overview?.lastAlertTime;
     final lastAlertLabel = lastAlertTime != null
         ? DateFormat('MM/dd HH:mm').format(lastAlertTime.toLocal())
-        : 'No alerts yet';
+        : 'None';
 
 
     return SingleChildScrollView(
@@ -327,6 +327,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 value: '$totalDevices',
                 delta: '$onlineDevices online',
                 icon: Icons.podcasts,
+                onTap: () => setState(() => _selectedIndex = 2),
               ),
               const StatCard(
                 title: '네트워크 상태',
@@ -341,6 +342,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 delta: '마지막: $lastAlertLabel',
                 icon: Icons.warning_amber,
                 color: SafeOnColors.accent,
+                onTap: () => setState(() => _selectedIndex = 1),
               ),
               StatCard(
                 title: '최근 알림 수집',
