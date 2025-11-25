@@ -5,6 +5,8 @@ import com.example.demo.dto.user.UserResponseDto;
 import com.example.demo.dto.user.UserUpdateRequestDto;
 import com.example.demo.security.AuthenticatedUser;
 import com.example.demo.service.MyPageService;
+
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -17,6 +19,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequiredArgsConstructor
+@SecurityRequirement(name = "BearerAuth")
 @RequestMapping("/mypage")
 public class MyPageController {
 

@@ -6,6 +6,8 @@ import com.example.demo.dto.dashboard.DashboardOverviewDto;
 import com.example.demo.dto.dashboard.RecentAlertListResponseDto;
 import com.example.demo.security.AuthenticatedUser;
 import com.example.demo.service.DashboardService;
+
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -18,6 +20,7 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 @RestController
 @RequiredArgsConstructor
+@SecurityRequirement(name = "BearerAuth")
 @RequestMapping("/dashboard")
 public class DashboardController {
 

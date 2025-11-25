@@ -6,6 +6,8 @@ import com.example.demo.dto.device.DeviceDiscoveryRequestDto;
 import com.example.demo.dto.device.DeviceResponseDto;
 import com.example.demo.security.AuthenticatedUser;
 import com.example.demo.service.DeviceService;
+
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -24,6 +26,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/devices")
+@SecurityRequirement(name = "BearerAuth")
 @Tag(name = "Device Page")
 public class DeviceController {
 
@@ -62,7 +65,7 @@ public class DeviceController {
     @GetMapping("/{deviceId}")
     public ResponseEntity<ApiResponseDto<DeviceResponseDto>> getDevice(
             @AuthenticationPrincipal AuthenticatedUser currentUser,
-            @PathVariable String deviceId
+            @PathVariable("deviceId") String deviceId
     ) {
         DeviceResponseDto data = deviceService.getDevice(deviceId, currentUser.userId());
         return ResponseEntity.ok(ApiResponseDto.ok(data));
@@ -71,7 +74,7 @@ public class DeviceController {
     @DeleteMapping("/{deviceId}")
     public ResponseEntity<ApiResponseDto<SimpleMessageResponseDto>> deleteDevice(
             @AuthenticationPrincipal AuthenticatedUser currentUser,
-            @PathVariable String deviceId
+            @PathVariable("deviceId") String deviceId
     ) {
         deviceService.deleteDevice(deviceId, currentUser.userId());
         return ResponseEntity.ok(ApiResponseDto.ok(
@@ -82,7 +85,7 @@ public class DeviceController {
     @PostMapping("/{deviceId}/claim")
     public ResponseEntity<ApiResponseDto<DeviceResponseDto>> claimDevice(
             @AuthenticationPrincipal AuthenticatedUser currentUser,
-            @PathVariable String deviceId
+            @PathVariable("deviceId") String deviceId
     ) {
         DeviceResponseDto data = deviceService.claimDevice(deviceId, currentUser.userId());
         return ResponseEntity.ok(ApiResponseDto.ok(data));
