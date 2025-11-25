@@ -282,83 +282,55 @@ class _DashboardScreenState extends State<DashboardScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            physics: const BouncingScrollPhysics(),
-            child: Row(
-              children: [
-                StatusChip(
-                  label: _isHomeModeArmed
-                      ? 'Home Mode: Armed'
-                      : 'Home Mode: Disarmed',
-                  icon: _isHomeModeArmed
-                      ? Icons.lock_outline
-                      : Icons.lock_open_outlined,
-                  color: _isHomeModeArmed
-                      ? SafeOnColors.primary
-                      : SafeOnColors.warning,
-                ),
-                const SizedBox(width: 12),
-                StatusChip(
-                  label: _isAutomationActive
-                      ? 'Automation Active'
-                      : 'Automation Paused',
-                  icon: _isAutomationActive
-                      ? Icons.auto_mode
-                      : Icons.pause_circle_outline,
-                  color: _isAutomationActive
-                      ? SafeOnColors.primary
-                      : SafeOnColors.danger,
-                ),
-              ],
-            ),
+          _SecurityGraphCard(
+            name: _profile.name,
+            alertCount: alertCount,
+            onlineDevices: onlineDevices,
           ),
-          const SizedBox(height: 24),
-          GridView.count(
-            crossAxisCount: 2,
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            crossAxisSpacing: 16,
-            mainAxisSpacing: 16,
-            childAspectRatio: 0.96,
+          const SizedBox(height: 22),
+          Wrap(
+            spacing: 14,
+            runSpacing: 14,
             children: [
-              StatCard(
+              _InsightCard(
                 title: '총 기기 수',
                 value: '$totalDevices',
-                delta: '$onlineDevices online',
+                caption: '$onlineDevices online',
                 icon: Icons.podcasts,
+                accent: SafeOnColors.primary,
                 onTap: () => setState(() => _selectedIndex = 2),
               ),
-              const StatCard(
+              _InsightCard(
                 title: '네트워크 상태',
                 value: '정상',
-                delta: '모든 서비스 정상',
+                caption: '모든 서비스 정상',
                 icon: Icons.verified_user,
-                color: SafeOnColors.success,
+                accent: SafeOnColors.success,
               ),
-              StatCard(
+              _InsightCard(
                 title: '누적 알림',
                 value: '$alertCount',
-                delta: '마지막: $lastAlertLabel',
+                caption: '마지막: $lastAlertLabel',
                 icon: Icons.warning_amber,
-                color: SafeOnColors.accent,
+                accent: SafeOnColors.accent,
                 onTap: () => setState(() => _selectedIndex = 1),
               ),
-              StatCard(
+              _InsightCard(
                 title: '최근 알림 수집',
                 value: '${_alerts.length}',
-                delta: '최근 24h 기록',
+                caption: '최근 24h 기록',
                 icon: Icons.wifi_tethering,
+                accent: SafeOnColors.primaryVariant,
               ),
             ],
           ),
-          const SizedBox(height: 32),
+          const SizedBox(height: 28),
           SectionHeader(
             title: 'Featured Devices',
             actionLabel: 'View all',
             onActionTap: () => setState(() => _selectedIndex = 2),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 14),
           if (_devices.isEmpty)
             _buildInlineEmptyState(
               context: context,
@@ -369,18 +341,26 @@ class _DashboardScreenState extends State<DashboardScreen> {
               onActionTap: () => setState(() => _selectedIndex = 2),
             )
           else
-            ..._devices
-                .map(
-                  (device) => Padding(
-                    padding: const EdgeInsets.only(bottom: 18),
+            SizedBox(
+              height: 210,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                physics: const BouncingScrollPhysics(),
+                itemCount: _devices.length,
+                separatorBuilder: (_, __) => const SizedBox(width: 14),
+                itemBuilder: (context, index) {
+                  final device = _devices[index];
+                  return SizedBox(
+                    width: 280,
                     child: DeviceCard(
                       device: device,
                       onTap: () => _openDeviceDetail(device),
                     ),
-                  ),
-                )
-                .toList(),
-          const SizedBox(height: 12),
+                  );
+                },
+              ),
+            ),
+          const SizedBox(height: 18),
           SectionHeader(
             title: 'Latest Alerts',
             actionLabel: 'See history',
@@ -397,7 +377,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
               onActionTap: () => setState(() => _selectedIndex = 1),
             )
           else
-            ..._alerts.map((alert) => AlertTile(alert: alert)).toList(),
+            ..._alerts
+                .map(
+                  (alert) => Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: AlertTile(alert: alert),
+                  ),
+                )
+                .toList(),
           const SizedBox(height: 32),
         ],
       ),
@@ -856,6 +843,337 @@ class _DashboardScreenState extends State<DashboardScreen> {
     if (shouldLogout) {
       widget.onLogout();
     }
+  }
+}
+
+class _SecurityGraphCard extends StatelessWidget {
+  const _SecurityGraphCard({
+    required this.name,
+    required this.alertCount,
+    required this.onlineDevices,
+  });
+
+  final String name;
+  final int alertCount;
+  final int onlineDevices;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    const points = <double>[0.12, 0.22, 0.18, 0.4, 0.28, 0.55, 0.33, 0.62, 0.48, 0.7, 0.52, 0.82, 0.64, 0.6, 0.72];
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFF0F172A), Color(0xFF0B1224)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.22),
+            blurRadius: 30,
+            offset: const Offset(0, 16),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.06),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 8,
+                      height: 8,
+                      decoration: BoxDecoration(
+                        color: SafeOnColors.accent,
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: SafeOnColors.accent.withOpacity(0.5),
+                            blurRadius: 8,
+                            spreadRadius: 1,
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Live security pulse',
+                      style: theme.textTheme.labelMedium?.copyWith(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Spacer(),
+              Text(
+                'Hello, $name',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: Colors.white70,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          SizedBox(
+            height: 190,
+            child: CustomPaint(
+              painter: _SecurityLinePainter(
+                points: points,
+                strokeColor: SafeOnColors.primary,
+                fillColor: SafeOnColors.primary.withOpacity(0.24),
+              ),
+              child: Container(
+                padding: const EdgeInsets.fromLTRB(12, 8, 12, 10),
+                alignment: Alignment.bottomLeft,
+                child: Text(
+                  'SafeOn Detection Count',
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    color: Colors.white70,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 14),
+          Column(
+            children: [
+              _GraphStat(
+                label: 'Active devices',
+                value: '$onlineDevices',
+                chipColor: SafeOnColors.success,
+              ),
+              const SizedBox(height: 8),
+              _GraphStat(
+                label: 'Alerts today',
+                value: '$alertCount',
+                chipColor: SafeOnColors.accent,
+              ),
+              const SizedBox(height: 8),
+              _GraphStat(
+                label: 'Feed status',
+                value: 'Simulated',
+                chipColor: colorScheme.secondary,
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _GraphStat extends StatelessWidget {
+  const _GraphStat({
+    required this.label,
+    required this.value,
+    required this.chipColor,
+  });
+
+  final String label;
+  final String value;
+  final Color chipColor;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.04),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Colors.white.withOpacity(0.08)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 8,
+                height: 8,
+                decoration: BoxDecoration(
+                  color: chipColor,
+                  shape: BoxShape.circle,
+                ),
+              ),
+              const SizedBox(width: 6),
+              Text(
+                label,
+                style: theme.textTheme.labelMedium?.copyWith(
+                  color: Colors.white70,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            value,
+            style: theme.textTheme.titleMedium?.copyWith(
+              color: Colors.white,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SecurityLinePainter extends CustomPainter {
+  _SecurityLinePainter({
+    required this.points,
+    required this.strokeColor,
+    required this.fillColor,
+  });
+
+  final List<double> points;
+  final Color strokeColor;
+  final Color fillColor;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (points.isEmpty) return;
+
+    final path = Path();
+    final fillPath = Path();
+    final maxPoint = points.reduce((a, b) => a > b ? a : b).clamp(0.01, 1.0);
+
+    final dx = size.width / (points.length - 1);
+    final firstY = size.height - (points.first / maxPoint) * size.height;
+
+    path.moveTo(0, firstY);
+    fillPath.moveTo(0, size.height);
+    fillPath.lineTo(0, firstY);
+
+    for (var i = 1; i < points.length; i++) {
+      final x = dx * i;
+      final y = size.height - (points[i] / maxPoint) * size.height;
+      path.lineTo(x, y);
+      fillPath.lineTo(x, y);
+    }
+
+    fillPath.lineTo(size.width, size.height);
+    fillPath.close();
+
+    final fillPaint = Paint()
+      ..style = PaintingStyle.fill
+      ..shader = LinearGradient(
+        colors: [fillColor, Colors.transparent],
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+      ).createShader(Rect.fromLTWH(0, 0, size.width, size.height));
+
+    final strokePaint = Paint()
+      ..style = PaintingStyle.stroke
+      ..color = strokeColor
+      ..strokeWidth = 3.0
+      ..strokeCap = StrokeCap.round
+      ..maskFilter = const MaskFilter.blur(BlurStyle.solid, 0.8);
+
+    canvas.drawPath(fillPath, fillPaint);
+    canvas.drawPath(path, strokePaint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+class _InsightCard extends StatelessWidget {
+  const _InsightCard({
+    required this.title,
+    required this.value,
+    required this.caption,
+    required this.icon,
+    required this.accent,
+    this.onTap,
+  });
+
+  final String title;
+  final String value;
+  final String caption;
+  final IconData icon;
+  final Color accent;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return SizedBox(
+      width: (MediaQuery.of(context).size.width - 24 * 2 - 14) / 2,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(18),
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: SafeOnColors.surface,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: accent.withOpacity(0.18)),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.04),
+                blurRadius: 16,
+                offset: const Offset(0, 10),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: accent.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(icon, color: accent, size: 22),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                title,
+                style: theme.textTheme.titleMedium?.copyWith(
+                  color: SafeOnColors.textSecondary,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                value,
+                style: theme.textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.w700,
+                  color: SafeOnColors.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                caption,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: SafeOnColors.textSecondary,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
 

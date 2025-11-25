@@ -68,33 +68,6 @@ class DeviceCard extends StatelessWidget {
                 device.locationLabel,
                 style: theme.textTheme.bodyMedium,
               ),
-              const SizedBox(height: 20),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(16),
-                child: LinearProgressIndicator(
-                  value: device.connectionStrength,
-                  minHeight: 8,
-                  backgroundColor: SafeOnColors.scaffold,
-                  color: SafeOnColors.primary,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'Connection',
-                    style: theme.textTheme.labelMedium,
-                  ),
-                  Text(
-                    '${(device.connectionStrength * 100).round()}%',
-                    style: theme.textTheme.labelMedium?.copyWith(
-                          color: SafeOnColors.textPrimary,
-                          fontWeight: FontWeight.w600,
-                        ),
-                  ),
-                ],
-              ),
             ],
           ),
         ),

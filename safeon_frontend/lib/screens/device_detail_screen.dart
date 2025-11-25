@@ -75,23 +75,6 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
                     icon: Icons.verified_user,
                     color: widget.device.isOnline ? SafeOnColors.success : SafeOnColors.danger,
                   ),
-                  const SizedBox(height: 18),
-                  Text('Connection Strength', style: theme.textTheme.titleMedium),
-                  const SizedBox(height: 12),
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(16),
-                    child: LinearProgressIndicator(
-                      value: widget.device.connectionStrength,
-                      minHeight: 10,
-                      backgroundColor: SafeOnColors.scaffold,
-                      color: SafeOnColors.primary,
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  Text(
-                    '${(widget.device.connectionStrength * 100).round()}% connected',
-                    style: theme.textTheme.bodyMedium,
-                  ),
                 ],
               ),
             ),
