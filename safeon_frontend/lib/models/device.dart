@@ -20,15 +20,19 @@ class SafeOnDevice {
   final DateTime? linkedAt;
 
   factory SafeOnDevice.fromDashboardJson(Map<String, dynamic> json) {
-    final mac = json['macAddress'] ?? json['macAddr'];
-    final deviceName = json['name'] ?? json['label'] ?? json['vendor'];
-    
+    final String? mac =
+        json['macAddress'] as String? ?? json['macAddr'] as String?;
+    final String? deviceName = json['name'] as String? ??
+        json['label'] as String? ??
+        json['vendor'] as String?;
+
     return SafeOnDevice(
       id: json['id'] as String? ?? '',
-      name: deviceName as String? ?? 'SafeOn Device',
+      name: deviceName ?? 'SafeOn Device',
       ip: json['ip'] as String? ?? '—',
-      macAddress: mac as String? ?? '—',
+      macAddress: mac ?? '—',
       discovered: json['discovered'] as bool? ?? false,
+      label: json['label'] as String? ?? deviceName ?? 'SafeOn Device',
       createdAt: json['createdAt'] != null
           ? DateTime.tryParse(json['createdAt'] as String)
           : null,
