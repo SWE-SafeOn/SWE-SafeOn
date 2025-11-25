@@ -1,10 +1,12 @@
 package com.example.demo.controller;
 
 import com.example.demo.dto.ApiResponseDto;
+import com.example.demo.dto.alert.AlertCreateRequestDto;
 import com.example.demo.dto.alert.AlertResponseDto;
 import com.example.demo.security.AuthenticatedUser;
 import com.example.demo.service.AlertService;
 
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -13,13 +15,16 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
+import jakarta.validation.Valid;
 import java.util.List;
 
 
 @RestController
 @RequiredArgsConstructor
+@SecurityRequirement(name = "BearerAuth")
 @RequestMapping("/alerts")
 @Tag(name = "Alerts")
 public class AlertController {
@@ -39,9 +44,19 @@ public class AlertController {
     @GetMapping("/{alertId}")
     public ResponseEntity<ApiResponseDto<AlertResponseDto>> getAlert(
             @AuthenticationPrincipal AuthenticatedUser currentUser,
-            @PathVariable String alertId
+            @PathVariable("alertId") String alertId
     ) {
         AlertResponseDto alert = alertService.getAlert(alertId, currentUser.userId());
+        return ResponseEntity.ok(ApiResponseDto.ok(alert));
+    }
+
+    // 테스트/임의 생성용 로그 추가
+    @PostMapping
+    public ResponseEntity<ApiResponseDto<AlertResponseDto>> createAlert(
+            @AuthenticationPrincipal AuthenticatedUser currentUser,
+            @Valid @RequestBody AlertCreateRequestDto request
+    ) {
+        AlertResponseDto alert = alertService.createAlert(request, currentUser.userId());
         return ResponseEntity.ok(ApiResponseDto.ok(alert));
     }
 
@@ -49,7 +64,7 @@ public class AlertController {
     @PostMapping("/{alertId}/ack")
     public ResponseEntity<ApiResponseDto<AlertResponseDto>> acknowledgeAlert(
             @AuthenticationPrincipal AuthenticatedUser currentUser,
-            @PathVariable String alertId
+            @PathVariable("alertId") String alertId
     ) {
         AlertResponseDto alert = alertService.acknowledgeAlert(alertId, currentUser.userId());
         return ResponseEntity.ok(ApiResponseDto.ok(alert));
