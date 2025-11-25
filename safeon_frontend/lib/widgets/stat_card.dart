@@ -49,17 +49,25 @@ class StatCard extends StatelessWidget {
                   ),
                   child: Icon(icon, color: resolvedColor, size: 20),
                 ),
-              const Spacer(),
+              if (icon != null) const SizedBox(width: 12),
               if (delta != null)
-                Text(
-                  delta!,
-                  style: theme.textTheme.labelMedium?.copyWith(
-                    color: resolvedColor,
-                    fontWeight: FontWeight.w600,
+                Expanded(
+                  child: Align(
+                    alignment: Alignment.centerRight,
+                    child: Text(
+                      delta!,
+                      textAlign: TextAlign.right,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.labelMedium?.copyWith(
+                        color: resolvedColor,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                   ),
                 ),
-            ],
-          ),
+              ],
+            ),
           const SizedBox(height: 18),
           Text(
             value,
