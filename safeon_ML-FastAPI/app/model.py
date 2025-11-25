@@ -155,7 +155,7 @@ def detect_intrusion(raw_packet: dict):
 # ============================================================
 print("\nTesting intrusion detection...")
 
-sample_df = pd.read_csv("data/normal_esp32_win10.csv").head(50)
+sample_df = pd.read_csv("data/normal_esp32_win10.csv").head(40)
 
 for i in range(len(sample_df)):
     pkt = {
