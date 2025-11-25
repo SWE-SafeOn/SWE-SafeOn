@@ -1150,6 +1150,7 @@ class _DiscoveredDeviceEmptyState extends StatelessWidget {
 
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         Container(
           padding: const EdgeInsets.all(18),
@@ -1167,6 +1168,7 @@ class _DiscoveredDeviceEmptyState extends StatelessWidget {
         Text(
           '허브가 새로운 기기를 찾지 못했어요.',
           style: theme.textTheme.titleMedium,
+          textAlign: TextAlign.center,
         ),
         const SizedBox(height: 6),
         Text(
@@ -1198,6 +1200,7 @@ class _DiscoveredDeviceError extends StatelessWidget {
 
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         const Icon(
           Icons.error_outline,
