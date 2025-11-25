@@ -1005,14 +1005,19 @@ class _DiscoveredDeviceSheetState extends State<_DiscoveredDeviceSheet> {
                       }
 
                       if (snapshot.hasError) {
-                        return _DiscoveredDeviceError(
-                          onRetry: _retryFetch,
+                        return Center(
+                          child: _DiscoveredDeviceError(
+                            onRetry: _retryFetch,
+                          )
                         );
                       }
 
                       final devices = snapshot.data ?? [];
                       if (devices.isEmpty) {
-                        return _DiscoveredDeviceEmptyState(onRetry: _retryFetch);
+                        return Center(
+                          child:
+                              _DiscoveredDeviceEmptyState(onRetry: _retryFetch),
+                        );
                       }
 
                       return ListView.separated(
