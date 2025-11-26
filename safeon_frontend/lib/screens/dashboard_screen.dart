@@ -896,10 +896,15 @@ class _SecurityGraphCard extends StatefulWidget {
 class _SecurityGraphCardState extends State<_SecurityGraphCard> {
   int? _hoveredIndex;
   double? _hoverDx;
+  double? _graphWidth;
   _WeekContext? _cachedWeekContext;
 
   _WeekContext get _weekContext =>
       _cachedWeekContext ??= _WeekContext.fromDate(DateTime.now());
+
+  void _updateGraphWidth(double width) {
+    _graphWidth = width;
+  }
 
   void _updateHover(double dx, double width) {
     final step = width / (_securityGraphCounts.length - 1);
@@ -918,6 +923,20 @@ class _SecurityGraphCardState extends State<_SecurityGraphCard> {
         _hoverDx = null;
       });
     }
+  }
+
+  void _jumpToDay(int index) {
+    final width = _graphWidth;
+    if (width == null || _securityGraphCounts.isEmpty) return;
+
+    if (_hoveredIndex == index) {
+      _clearHover();
+      return;
+    }
+
+    final step = width / (_securityGraphCounts.length - 1);
+    final dx = step * index;
+    _updateHover(dx, width);
   }
 
   @override
@@ -1018,6 +1037,7 @@ class _SecurityGraphCardState extends State<_SecurityGraphCard> {
             child: LayoutBuilder(
               builder: (context, constraints) {
                 final graphWidth = constraints.maxWidth;
+                _updateGraphWidth(graphWidth);
 
                 return MouseRegion(
                   onHover: (event) => _updateHover(event.localPosition.dx, graphWidth),
@@ -1070,6 +1090,7 @@ class _SecurityGraphCardState extends State<_SecurityGraphCard> {
             labels: _weekContext.dayLabels,
             counts: points,
             highlightIndex: _hoveredIndex,
+            onTapDay: _jumpToDay,
           ),
           const SizedBox(height: 14),
           Column(
@@ -1195,11 +1216,13 @@ class _WeekLegend extends StatelessWidget {
     required this.labels,
     required this.counts,
     required this.highlightIndex,
+    required this.onTapDay,
   });
 
   final List<String> labels;
   final List<int> counts;
   final int? highlightIndex;
+  final void Function(int index) onTapDay;
 
   @override
   Widget build(BuildContext context) {
@@ -1209,9 +1232,12 @@ class _WeekLegend extends StatelessWidget {
       children: List.generate(labels.length, (index) {
         final isActive = highlightIndex == index;
         return Expanded(
-          child: Column(
-            children: [
-              AnimatedContainer(
+          child: InkWell(
+            onTap: () => onTapDay(index),
+            borderRadius: BorderRadius.circular(12),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 2),
+              child: AnimatedContainer(
                 duration: const Duration(milliseconds: 160),
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
                 decoration: BoxDecoration(
@@ -1241,7 +1267,7 @@ class _WeekLegend extends StatelessWidget {
                   ],
                 ),
               ),
-            ],
+            ),
           ),
         );
       }),
