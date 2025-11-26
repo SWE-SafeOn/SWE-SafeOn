@@ -809,12 +809,25 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  void _openDeviceDetail(SafeOnDevice device) {
-    Navigator.of(context).push(
+  Future<void> _openDeviceDetail(SafeOnDevice device) async {
+    final removed = await Navigator.of(context).push<bool>(
       MaterialPageRoute(
-        builder: (context) => DeviceDetailScreen(device: device),
+        builder: (context) => DeviceDetailScreen(
+          device: device,
+          apiClient: widget.apiClient,
+          token: widget.session.token,
+        ),
       ),
     );
+
+    if (removed == true && mounted) {
+      setState(() {
+        _devices = _devices.where((d) => d.id != device.id).toList();
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('"${device.displayName}" 디바이스가 제거되었습니다.')),
+      );
+    }
   }
 
   Future<void> _onLogoutPressed() async {

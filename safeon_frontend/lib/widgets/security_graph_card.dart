@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../theme/app_theme.dart';
 
-const _securityGraphCounts = <int>[24, 18, 32, 28, 36, 22, 14]; // Mon-Sun
+const _securityGraphCounts = <int>[24, 18, 32, 28, 36, 22, 14]; // 추후 백엔드 반영
 const _weekdaySymbolsKo = ['월', '화', '수', '목', '금', '토', '일'];
 
 class SecurityGraphCard extends StatefulWidget {

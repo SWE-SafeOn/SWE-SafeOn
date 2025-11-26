@@ -215,6 +215,26 @@ class SafeOnApiClient {
     );
   }
 
+  Future<void> deleteDevice({
+    required String token,
+    required String deviceId,
+  }) async {
+    final response = await _httpClient.delete(
+      _uri('/devices/$deviceId'),
+      headers: _jsonHeaders(token: token),
+    );
+
+    if (response.statusCode == 200 || response.statusCode == 204) {
+      return;
+    }
+
+    final body = _decode(response);
+    throw ApiException(
+      _extractError(body) ?? '디바이스 삭제에 실패했습니다.',
+      response.statusCode,
+    );
+  }
+
   Future<List<SafeOnAlert>> fetchRecentAlerts(String token, {int? limit}) async {
     final response = await _httpClient.get(
       _uri('/dashboard/alerts', limit != null ? {'limit': '$limit'} : null),
