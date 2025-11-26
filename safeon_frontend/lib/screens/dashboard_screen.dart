@@ -846,7 +846,25 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 }
 
-class _SecurityGraphCard extends StatelessWidget {
+const _securityGraphCounts = <int>[
+  12,
+  22,
+  18,
+  40,
+  28,
+  55,
+  33,
+  62,
+  48,
+  70,
+  52,
+  82,
+  64,
+  60,
+  72,
+];
+
+class _SecurityGraphCard extends StatefulWidget {
   const _SecurityGraphCard({
     required this.name,
     required this.alertCount,
@@ -858,11 +876,38 @@ class _SecurityGraphCard extends StatelessWidget {
   final int onlineDevices;
 
   @override
+  State<_SecurityGraphCard> createState() => _SecurityGraphCardState();
+}
+
+class _SecurityGraphCardState extends State<_SecurityGraphCard> {
+  int? _hoveredIndex;
+  double? _hoverDx;
+
+  void _updateHover(double dx, double width) {
+    final step = width / (_securityGraphCounts.length - 1);
+    final index = (dx / step).round().clamp(0, _securityGraphCounts.length - 1);
+
+    setState(() {
+      _hoveredIndex = index;
+      _hoverDx = dx.clamp(0, width);
+    });
+  }
+
+  void _clearHover() {
+    if (_hoveredIndex != null || _hoverDx != null) {
+      setState(() {
+        _hoveredIndex = null;
+        _hoverDx = null;
+      });
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
-    const points = <double>[0.12, 0.22, 0.18, 0.4, 0.28, 0.55, 0.33, 0.62, 0.48, 0.7, 0.52, 0.82, 0.64, 0.6, 0.72];
+    final points = _securityGraphCounts;
 
     return Container(
       width: double.infinity,
@@ -923,7 +968,7 @@ class _SecurityGraphCard extends StatelessWidget {
               ),
               const Spacer(),
               Text(
-                'Hello, $name',
+                'Hello, ${widget.name}',
                 style: theme.textTheme.bodyMedium?.copyWith(
                   color: Colors.white70,
                 ),
@@ -933,23 +978,53 @@ class _SecurityGraphCard extends StatelessWidget {
           const SizedBox(height: 16),
           SizedBox(
             height: 190,
-            child: CustomPaint(
-              painter: _SecurityLinePainter(
-                points: points,
-                strokeColor: SafeOnColors.primary,
-                fillColor: SafeOnColors.primary.withOpacity(0.24),
-              ),
-              child: Container(
-                padding: const EdgeInsets.fromLTRB(12, 8, 12, 10),
-                alignment: Alignment.bottomLeft,
-                child: Text(
-                  'SafeOn Detection Count',
-                  style: theme.textTheme.labelMedium?.copyWith(
-                    color: Colors.white70,
-                    fontWeight: FontWeight.w500,
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final graphWidth = constraints.maxWidth;
+
+                return MouseRegion(
+                  onHover: (event) => _updateHover(event.localPosition.dx, graphWidth),
+                  onExit: (_) => _clearHover(),
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTapDown: (details) => _updateHover(details.localPosition.dx, graphWidth),
+                    onPanUpdate: (details) => _updateHover(details.localPosition.dx, graphWidth),
+                    onPanEnd: (_) => _clearHover(),
+                    child: Stack(
+                      children: [
+                        CustomPaint(
+                          painter: _SecurityLinePainter(
+                            points: points.map((point) => point.toDouble()).toList(),
+                            strokeColor: SafeOnColors.primary,
+                            fillColor: SafeOnColors.primary.withOpacity(0.24),
+                            highlightIndex: _hoveredIndex,
+                          ),
+                          child: Container(
+                            padding: const EdgeInsets.fromLTRB(12, 8, 12, 10),
+                            alignment: Alignment.bottomLeft,
+                            child: Text(
+                              'SafeOn Detection Count',
+                              style: theme.textTheme.labelMedium?.copyWith(
+                                color: Colors.white70,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                        ),
+                        if (_hoveredIndex != null && _hoverDx != null)
+                          Positioned(
+                            left: (_hoverDx! - 48)
+                                .clamp(0, graphWidth > 96 ? graphWidth - 96 : 0),
+                            top: 12,
+                            child: _GraphTooltip(
+                              label: '${points[_hoveredIndex!]} counts',
+                            ),
+                          ),
+                      ],
+                    ),
                   ),
-                ),
-              ),
+                );
+              },
             ),
           ),
           const SizedBox(height: 14),
@@ -957,13 +1032,13 @@ class _SecurityGraphCard extends StatelessWidget {
             children: [
               _GraphStat(
                 label: 'Active devices',
-                value: '$onlineDevices',
+                value: '${widget.onlineDevices}',
                 chipColor: SafeOnColors.success,
               ),
               const SizedBox(height: 8),
               _GraphStat(
                 label: 'Alerts today',
-                value: '$alertCount',
+                value: '${widget.alertCount}',
                 chipColor: SafeOnColors.accent,
               ),
               const SizedBox(height: 8),
@@ -1038,16 +1113,51 @@ class _GraphStat extends StatelessWidget {
   }
 }
 
+class _GraphTooltip extends StatelessWidget {
+  const _GraphTooltip({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.96),
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.2),
+            blurRadius: 12,
+            offset: const Offset(0, 6),
+          ),
+        ],
+        border: Border.all(color: SafeOnColors.primary.withOpacity(0.25)),
+      ),
+      child: Text(
+        label,
+        style: theme.textTheme.bodyMedium?.copyWith(
+          color: SafeOnColors.textPrimary,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+    );
+  }
+}
+
 class _SecurityLinePainter extends CustomPainter {
   _SecurityLinePainter({
     required this.points,
     required this.strokeColor,
     required this.fillColor,
+    this.highlightIndex,
   });
 
   final List<double> points;
   final Color strokeColor;
   final Color fillColor;
+  final int? highlightIndex;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -1055,20 +1165,25 @@ class _SecurityLinePainter extends CustomPainter {
 
     final path = Path();
     final fillPath = Path();
-    final maxPoint = points.reduce((a, b) => a > b ? a : b).clamp(0.01, 1.0);
+    final maxPoint = points
+        .reduce((a, b) => a > b ? a : b)
+        .clamp(0.01, double.infinity) as double;
 
     final dx = size.width / (points.length - 1);
     final firstY = size.height - (points.first / maxPoint) * size.height;
+    final offsets = <Offset>[];
 
     path.moveTo(0, firstY);
     fillPath.moveTo(0, size.height);
     fillPath.lineTo(0, firstY);
+    offsets.add(Offset(0, firstY));
 
     for (var i = 1; i < points.length; i++) {
       final x = dx * i;
       final y = size.height - (points[i] / maxPoint) * size.height;
       path.lineTo(x, y);
       fillPath.lineTo(x, y);
+      offsets.add(Offset(x, y));
     }
 
     fillPath.lineTo(size.width, size.height);
@@ -1091,10 +1206,37 @@ class _SecurityLinePainter extends CustomPainter {
 
     canvas.drawPath(fillPath, fillPaint);
     canvas.drawPath(path, strokePaint);
+
+    if (highlightIndex != null &&
+        highlightIndex! >= 0 &&
+        highlightIndex! < offsets.length) {
+      final point = offsets[highlightIndex!];
+
+      final glowPaint = Paint()
+        ..style = PaintingStyle.fill
+        ..color = strokeColor.withOpacity(0.28);
+
+      final dotPaint = Paint()
+        ..style = PaintingStyle.fill
+        ..color = Colors.white;
+
+      final innerDotPaint = Paint()
+        ..style = PaintingStyle.fill
+        ..color = strokeColor;
+
+      canvas.drawCircle(point, 10, glowPaint);
+      canvas.drawCircle(point, 5.5, dotPaint);
+      canvas.drawCircle(point, 3.6, innerDotPaint);
+    }
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+  bool shouldRepaint(covariant _SecurityLinePainter oldDelegate) {
+    return oldDelegate.points != points ||
+        oldDelegate.strokeColor != strokeColor ||
+        oldDelegate.fillColor != fillColor ||
+        oldDelegate.highlightIndex != highlightIndex;
+  }
 }
 
 class _InsightCard extends StatelessWidget {
