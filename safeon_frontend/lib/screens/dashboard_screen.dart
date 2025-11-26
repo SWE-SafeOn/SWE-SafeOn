@@ -846,23 +846,37 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 }
 
-const _securityGraphCounts = <int>[
-  12,
-  22,
-  18,
-  40,
-  28,
-  55,
-  33,
-  62,
-  48,
-  70,
-  52,
-  82,
-  64,
-  60,
-  72,
-];
+const _securityGraphCounts = <int>[24, 18, 32, 28, 36, 22, 14]; // Mon-Sun
+const _weekdaySymbolsKo = ['월', '화', '수', '목', '금', '토', '일'];
+
+class _WeekContext {
+  _WeekContext({
+    required this.month,
+    required this.weekOfMonth,
+    required this.dayLabels,
+  });
+
+  final int month;
+  final int weekOfMonth;
+  final List<String> dayLabels;
+
+  factory _WeekContext.fromDate(DateTime date) {
+    final local = DateTime(date.year, date.month, date.day);
+    final startOfWeek = local.subtract(Duration(days: (local.weekday + 6) % 7)); // Monday as 0
+    final days = List.generate(7, (i) => startOfWeek.add(Duration(days: i)));
+
+    final firstOfMonth = DateTime(local.year, local.month, 1);
+    final firstWeekdayOffset = (firstOfMonth.weekday + 6) % 7; // 0-based, Monday start
+    final dayIndex = local.day + firstWeekdayOffset - 1;
+    final weekOfMonth = (dayIndex / 7).floor() + 1;
+
+    return _WeekContext(
+      month: local.month,
+      weekOfMonth: weekOfMonth,
+      dayLabels: days.map((d) => _weekdaySymbolsKo[(d.weekday + 6) % 7]).toList(),
+    );
+  }
+}
 
 class _SecurityGraphCard extends StatefulWidget {
   const _SecurityGraphCard({
@@ -882,6 +896,10 @@ class _SecurityGraphCard extends StatefulWidget {
 class _SecurityGraphCardState extends State<_SecurityGraphCard> {
   int? _hoveredIndex;
   double? _hoverDx;
+  _WeekContext? _cachedWeekContext;
+
+  _WeekContext get _weekContext =>
+      _cachedWeekContext ??= _WeekContext.fromDate(DateTime.now());
 
   void _updateHover(double dx, double width) {
     final step = width / (_securityGraphCounts.length - 1);
@@ -975,6 +993,25 @@ class _SecurityGraphCardState extends State<_SecurityGraphCard> {
               ),
             ],
           ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Text(
+                '${_weekContext.month}월 ${_weekContext.weekOfMonth}주차',
+                style: theme.textTheme.titleMedium?.copyWith(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                '이번주 안전 탐지 현황',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: Colors.white70,
+                ),
+              ),
+            ],
+          ),
           const SizedBox(height: 16),
           SizedBox(
             height: 190,
@@ -1017,7 +1054,8 @@ class _SecurityGraphCardState extends State<_SecurityGraphCard> {
                                 .clamp(0, graphWidth > 96 ? graphWidth - 96 : 0),
                             top: 12,
                             child: _GraphTooltip(
-                              label: '${points[_hoveredIndex!]} counts',
+                              label:
+                                  '${_weekContext.dayLabels[_hoveredIndex!]} • ${points[_hoveredIndex!]}',
                             ),
                           ),
                       ],
@@ -1026,6 +1064,12 @@ class _SecurityGraphCardState extends State<_SecurityGraphCard> {
                 );
               },
             ),
+          ),
+          const SizedBox(height: 10),
+          _WeekLegend(
+            labels: _weekContext.dayLabels,
+            counts: points,
+            highlightIndex: _hoveredIndex,
           ),
           const SizedBox(height: 14),
           Column(
@@ -1146,6 +1190,65 @@ class _GraphTooltip extends StatelessWidget {
   }
 }
 
+class _WeekLegend extends StatelessWidget {
+  const _WeekLegend({
+    required this.labels,
+    required this.counts,
+    required this.highlightIndex,
+  });
+
+  final List<String> labels;
+  final List<int> counts;
+  final int? highlightIndex;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: List.generate(labels.length, (index) {
+        final isActive = highlightIndex == index;
+        return Expanded(
+          child: Column(
+            children: [
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 160),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                decoration: BoxDecoration(
+                  color: isActive ? Colors.white.withOpacity(0.14) : Colors.transparent,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: Colors.white.withOpacity(isActive ? 0.3 : 0.12),
+                  ),
+                ),
+                child: Column(
+                  children: [
+                    Text(
+                      labels[index],
+                      style: theme.textTheme.labelMedium?.copyWith(
+                        color: Colors.white70,
+                        fontWeight: isActive ? FontWeight.w700 : FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '${counts[index]}',
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      }),
+    );
+  }
+}
+
 class _SecurityLinePainter extends CustomPainter {
   _SecurityLinePainter({
     required this.points,
@@ -1167,7 +1270,8 @@ class _SecurityLinePainter extends CustomPainter {
     final fillPath = Path();
     final maxPoint = points
         .reduce((a, b) => a > b ? a : b)
-        .clamp(0.01, double.infinity) as double;
+        .clamp(0.01, double.infinity)
+        .toDouble();
 
     final dx = size.width / (points.length - 1);
     final firstY = size.height - (points.first / maxPoint) * size.height;
