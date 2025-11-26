@@ -1,0 +1,15 @@
+{
+  "seq_len": 20,
+  "feature_columns": [
+    "src_ip",
+    "dst_ip",
+    "src_port",
+    "dst_port",
+    "proto",
+    "packet_count",
+    "byte_count",
+    "duration",
+    "pps",
+    "bps"
+  ]
+}
