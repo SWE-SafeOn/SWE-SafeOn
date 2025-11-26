@@ -52,12 +52,6 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-                child: _buildLiveFeedCard(),
-              ),
-            ),
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
                 child: _buildInsightsSection(),
               ),
             ),
@@ -142,10 +136,6 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
                           icon: widget.device.isOnline ? Icons.check_circle : Icons.error_outline,
                           color: widget.device.isOnline ? SafeOnColors.success : SafeOnColors.danger,
                         ),
-                        const SizedBox(width: 8),
-                        _buildSignalChip(widget.device.connectionStrength),
-                        const SizedBox(width: 8),
-                        _buildBadge(Icons.schedule, '지연 42ms'),
                       ],
                     ),
                   ],
@@ -154,79 +144,18 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
             ],
           ),
           const SizedBox(height: 16),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              _buildMetaItem(Icons.place_outlined, widget.device.locationLabel),
-              _buildMetaItem(Icons.language, widget.device.ip),
-              _buildMetaItem(Icons.qr_code_2, widget.device.macAddress),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              _buildQuickAction(Icons.shield, widget.device.isOnline ? 'Arm' : 'Offline', onTap: () {}),
-              const SizedBox(width: 12),
-              _buildQuickAction(Icons.mic_none, 'Talk', onTap: () {}),
-              const SizedBox(width: 12),
-              _buildQuickAction(Icons.fiber_manual_record_outlined, 'Record', onTap: () {}),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildLiveFeedCard() {
-    final bool isOnline = widget.device.isOnline;
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: _cardDecoration(),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              _buildBadge(Icons.videocam_outlined, '라이브 피드'),
-              const Spacer(),
-              _buildBadge(Icons.access_time, '최근 스냅샷 · 1분 전'),
-            ],
-          ),
-          const SizedBox(height: 14),
-          AnimatedContainer(
-            duration: const Duration(milliseconds: 300),
-            height: 180,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(16),
-              color: isOnline ? SafeOnColors.surface : Colors.grey.shade200,
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            physics: const BouncingScrollPhysics(),
+            child: Row(
+              children: [
+                _buildMetaItem(Icons.place_outlined, widget.device.locationLabel),
+                const SizedBox(width: 12),
+                _buildMetaItem(Icons.language, widget.device.ip),
+                const SizedBox(width: 12),
+                _buildMetaItem(Icons.qr_code_2, widget.device.macAddress),
+              ],
             ),
-            alignment: Alignment.center,
-            child: isOnline
-                ? const SizedBox.shrink()
-                : Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: const [
-                      Icon(Icons.wifi_off, size: 32, color: SafeOnColors.textSecondary),
-                      SizedBox(height: 8),
-                      Text('디바이스가 오프라인 상태입니다.', style: TextStyle(color: SafeOnColors.textSecondary)),
-                    ],
-                  ),
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              ElevatedButton.icon(
-                onPressed: isOnline ? () {} : null,
-                icon: const Icon(Icons.play_arrow),
-                label: const Text('라이브 보기'),
-              ),
-              const SizedBox(width: 12),
-              OutlinedButton.icon(
-                onPressed: () {},
-                icon: const Icon(Icons.view_list),
-                label: const Text('로그 보기'),
-              ),
-            ],
           ),
         ],
       ),
@@ -388,6 +317,14 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
   }
 
   Future<void> _removeDevice(BuildContext dialogContext) async {
+    if (widget.device.id.isEmpty) {
+      Navigator.of(dialogContext).pop();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('디바이스 ID를 확인할 수 없어 제거할 수 없습니다.')),
+      );
+      return;
+    }
+
     if (_isRemoving) return;
     setState(() => _isRemoving = true);
 
@@ -397,17 +334,17 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
         deviceId: widget.device.id,
       );
       if (!mounted) return;
-      Navigator.of(dialogContext).pop(); // close dialog
+      Navigator.of(dialogContext, rootNavigator: true).pop(); // close dialog
       Navigator.of(context).pop(true); // return success to previous screen
     } on ApiException catch (e) {
       if (!mounted) return;
-      Navigator.of(dialogContext).pop();
+      Navigator.of(dialogContext, rootNavigator: true).pop();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(e.message)),
       );
     } catch (_) {
       if (!mounted) return;
-      Navigator.of(dialogContext).pop();
+      Navigator.of(dialogContext, rootNavigator: true).pop();
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('디바이스 제거 중 오류가 발생했습니다. 다시 시도해주세요.')),
       );

@@ -219,19 +219,35 @@ class SafeOnApiClient {
     required String token,
     required String deviceId,
   }) async {
-    final response = await _httpClient.delete(
+    // 일부 백엔드 구현은 /dashboard/devices/:id 를 사용하므로, 기본 경로 실패 시 보조 경로를 시도한다.
+    final primary = await _httpClient.delete(
       _uri('/devices/$deviceId'),
       headers: _jsonHeaders(token: token),
     );
 
-    if (response.statusCode == 200 || response.statusCode == 204) {
+    if (primary.statusCode == 200 || primary.statusCode == 204) {
       return;
     }
 
-    final body = _decode(response);
+    if (primary.statusCode == 404 || primary.statusCode == 405) {
+      final fallback = await _httpClient.delete(
+        _uri('/dashboard/devices/$deviceId'),
+        headers: _jsonHeaders(token: token),
+      );
+      if (fallback.statusCode == 200 || fallback.statusCode == 204) {
+        return;
+      }
+      final body = _decode(fallback);
+      throw ApiException(
+        _extractError(body) ?? '디바이스 삭제에 실패했습니다.',
+        fallback.statusCode,
+      );
+    }
+
+    final body = _decode(primary);
     throw ApiException(
       _extractError(body) ?? '디바이스 삭제에 실패했습니다.',
-      response.statusCode,
+      primary.statusCode,
     );
   }
 

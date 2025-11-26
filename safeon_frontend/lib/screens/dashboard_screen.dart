@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:characters/characters.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -827,6 +829,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('"${device.displayName}" 디바이스가 제거되었습니다.')),
       );
+      // 최신 데이터 동기화
+      unawaited(_loadDashboard());
     }
   }
 
