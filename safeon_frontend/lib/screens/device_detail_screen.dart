@@ -52,18 +52,6 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-                child: _buildInsightsSection(),
-              ),
-            ),
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-                child: _buildControlsSection(),
-              ),
-            ),
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
                 child: _buildMetaSection(),
               ),
             ),
@@ -99,29 +87,7 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
         children: [
           Row(
             children: [
-              Container(
-                height: 76,
-                width: 76,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(20),
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFFEDF3FF), Color(0xFFD8E5FF)],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                ),
-                foregroundDecoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(20),
-                  color: widget.device.isOnline ? Colors.transparent : Colors.black.withOpacity(0.45),
-                ),
-                child: Center(
-                  child: Icon(
-                    widget.device.isOnline ? Icons.videocam_outlined : Icons.wifi_off,
-                    color: widget.device.isOnline ? SafeOnColors.primary : Colors.white,
-                    size: 34,
-                  ),
-                ),
-              ),
+              _buildDeviceAvatar(),
               const SizedBox(width: 16),
               Expanded(
                 child: Column(
@@ -161,87 +127,7 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
       ),
     );
   }
-
-  Widget _buildInsightsSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _buildSectionTitle('라이브 인사이트'),
-        const SizedBox(height: 8),
-        _buildInsightTile(
-          icon: Icons.timeline,
-          title: '활동 타임라인',
-          description: '최근 24시간 모션 2회 감지 · 이상 징후 없음',
-          actionLabel: '타임라인 열기',
-        ),
-        _buildInsightTile(
-          icon: Icons.cloud_outlined,
-          title: '클라우드 백업',
-          description: '영상이 안전한 SafeOn 클라우드에 동기화 중',
-          actionLabel: '스토리지 관리',
-        ),
-        _buildInsightTile(
-          icon: Icons.sensors_outlined,
-          title: '자동화 루틴',
-          description: '“Night Guard”, “Weekend Away”에 참여 중',
-          actionLabel: '루틴 편집',
-        ),
-      ],
-    );
-  }
-
-  Widget _buildControlsSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _buildSectionTitle('디바이스 컨트롤'),
-        const SizedBox(height: 8),
-        _buildControlTile(
-          title: 'Streaming',
-          subtitle: _isStreamingEnabled ? 'Live feed enabled' : 'Live feed paused',
-          trailing: Switch(
-            value: _isStreamingEnabled,
-            onChanged: (value) {
-              setState(() => _isStreamingEnabled = value);
-            },
-            activeThumbColor: SafeOnColors.primary,
-          ),
-        ),
-        _buildControlTile(
-          title: 'Two-way audio',
-          subtitle: _isTwoWayAudioEnabled ? 'Respond through device speaker' : 'Mic muted',
-          trailing: Switch(
-            value: _isTwoWayAudioEnabled,
-            onChanged: (value) {
-              setState(() => _isTwoWayAudioEnabled = value);
-            },
-            activeThumbColor: SafeOnColors.primary,
-          ),
-        ),
-        _buildControlTile(
-          title: 'Privacy shutter',
-          subtitle: _isPrivacyShutterEnabled ? 'Closes when family arrives' : 'Shutter open',
-          trailing: Switch(
-            value: _isPrivacyShutterEnabled,
-            onChanged: (value) {
-              setState(() => _isPrivacyShutterEnabled = value);
-            },
-            activeThumbColor: SafeOnColors.primary,
-          ),
-        ),
-        _buildControlTile(
-          title: '재부팅 / 진단',
-          subtitle: '장치 재시작 및 상태 점검',
-          trailing: OutlinedButton.icon(
-            onPressed: () {},
-            icon: const Icon(Icons.restart_alt),
-            label: const Text('실행'),
-          ),
-        ),
-      ],
-    );
-  }
-
+        
   Widget _buildMetaSection() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -509,6 +395,111 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
     );
   }
 
+  Widget _buildDeviceAvatar() {
+    final isOnline = widget.device.isOnline;
+    final typeIcon = _iconFromName(widget.device.icon);
+    final typeLabel = _deviceTypeLabel(widget.device.icon);
+    final gradient = isOnline
+        ? const [Color(0xFF1F6FEB), Color(0xFF4F8BFF)]
+        : const [Color(0xFFCBD5E1), Color(0xFFE2E8F0)];
+    final accent = isOnline ? SafeOnColors.success : SafeOnColors.warning;
+
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(6),
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            gradient: LinearGradient(
+              colors: gradient,
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: gradient.first.withOpacity(0.22),
+                blurRadius: 18,
+                offset: const Offset(0, 10),
+              ),
+            ],
+          ),
+          child: Container(
+            height: 82,
+            width: 82,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: Colors.white,
+              border: Border.all(
+                color: isOnline ? SafeOnColors.primary.withOpacity(0.15) : SafeOnColors.textSecondary.withOpacity(0.15),
+                width: 2,
+              ),
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  typeIcon,
+                  color: isOnline ? SafeOnColors.primary : SafeOnColors.textSecondary,
+                  size: 34,
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  typeLabel,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: isOnline ? SafeOnColors.textPrimary : SafeOnColors.textSecondary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        Positioned(
+          bottom: -10,
+          right: 0,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.06),
+                  blurRadius: 14,
+                  offset: const Offset(0, 8),
+                ),
+              ],
+              border: Border.all(color: accent.withOpacity(0.2)),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  height: 8,
+                  width: 8,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: accent,
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  isOnline ? '온라인' : '오프라인',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: accent,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildSignalChip(double strength) {
     final percent = (strength * 100).round();
     IconData icon;
@@ -544,6 +535,36 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
         ],
       ),
     );
+  }
+
+  IconData _iconFromName(String name) {
+    switch (name) {
+      case 'camera':
+        return Icons.videocam_outlined;
+      case 'hub':
+        return Icons.router_outlined;
+      case 'lock':
+        return Icons.lock_outline;
+      case 'sensor':
+        return Icons.sensors_outlined;
+      default:
+        return Icons.devices_other_outlined;
+    }
+  }
+
+  String _deviceTypeLabel(String name) {
+    switch (name) {
+      case 'camera':
+        return 'Camera';
+      case 'hub':
+        return 'Hub';
+      case 'lock':
+        return 'Lock';
+      case 'sensor':
+        return 'Sensor';
+      default:
+        return 'Device';
+    }
   }
 
   BoxDecoration _cardDecoration() {
