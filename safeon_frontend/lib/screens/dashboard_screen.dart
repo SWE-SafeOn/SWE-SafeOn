@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:characters/characters.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
@@ -10,6 +11,7 @@ import '../models/dashboard_overview.dart';
 import '../models/user_profile.dart';
 import '../models/user_session.dart';
 import '../services/safeon_api.dart';
+import '../services/notification_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/alert_tile.dart';
 import '../widgets/device_card.dart';
@@ -92,6 +94,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
   DashboardOverview? _overview;
   List<SafeOnDevice> _devices = const [];
   List<SafeOnAlert> _alerts = const [];
+  final Set<String> _knownAlertIds = {};
+  bool _hasLoadedInitialAlerts = false;
   bool _isLoading = true;
   String? _errorMessage;
   bool _isNightlyAutoArmEnabled = true;
@@ -138,13 +142,26 @@ class _DashboardScreenState extends State<DashboardScreen> {
         alerts,
       ]);
 
+      final fetchedAlerts = results[2] as List<SafeOnAlert>;
+      final newAlerts = _computeNewAlerts(fetchedAlerts);
+
       if (!mounted) return;
       setState(() {
         _overview = results[0] as DashboardOverview;
         _devices = results[1] as List<SafeOnDevice>;
-        _alerts = results[2] as List<SafeOnAlert>;
+        _alerts = fetchedAlerts;
+        _knownAlertIds
+          ..clear()
+          ..addAll(fetchedAlerts.map((alert) => alert.id));
+        _hasLoadedInitialAlerts = true;
         _isLoading = false;
       });
+
+      if (_isPushnotificationsEnabled && newAlerts.isNotEmpty) {
+        for (final alert in newAlerts) {
+          await NotificationService.showAlertNotification(alert);
+        }
+      }
     } on ApiException catch (e) {
       if (!mounted) return;
       setState(() {
@@ -189,6 +206,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
   }
 
+  List<SafeOnAlert> _computeNewAlerts(List<SafeOnAlert> fetchedAlerts) {
+    if (!_hasLoadedInitialAlerts) {
+      return const [];
+    }
+
+    return fetchedAlerts
+        .where((alert) => !_knownAlertIds.contains(alert.id))
+        .toList();
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -217,14 +244,21 @@ class _DashboardScreenState extends State<DashboardScreen> {
           const SizedBox(width: 8),
           Padding(
             padding: const EdgeInsets.only(right: 16),
-            child: CircleAvatar(
-              radius: 18,
-              backgroundColor: SafeOnColors.primary.withOpacity(0.2),
-              child: Text(
-                _avatarLabel,
-                style: theme.textTheme.titleMedium?.copyWith(
-                  color: SafeOnColors.primary,
-                  fontWeight: FontWeight.bold,
+            child: Tooltip(
+              message: '프로필로 이동',
+              child: InkWell(
+                onTap: () => setState(() => _selectedIndex = 3),
+                customBorder: const CircleBorder(),
+                child: CircleAvatar(
+                  radius: 18,
+                  backgroundColor: SafeOnColors.primary.withOpacity(0.2),
+                  child: Text(
+                    _avatarLabel,
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      color: SafeOnColors.primary,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                 ),
               ),
             ),
@@ -538,19 +572,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
           ),
           _buildSettingTile(
-            icon: Icons.sensors,
-            title: '모션 민감도',
-            subtitle: _motionSensitivityLevel.description,
-            trailing: _MotionSensitivitySelector(
-              selectedLevel: _motionSensitivityLevel,
-              onChanged: (level) {
-                setState(() {
-                  _motionSensitivityLevel = level;
-                });
-              },
-            ),
-          ),
-          _buildSettingTile(
             icon:
                 _isAutomationActive ? Icons.auto_mode : Icons.pause_circle_outline,
             title: '자동화 루틴',
@@ -843,22 +864,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Future<void> _onLogoutPressed() async {
-    final shouldLogout = await showDialog<bool>(
+    final shouldLogout = await showCupertinoDialog<bool>(
           context: context,
-          builder: (context) => AlertDialog(
-            title: const Text('로그아웃하시겠어요?'),
-            content: const Text('로그아웃하면 다시 온보딩 과정을 진행해야 합니다.'),
+          builder: (context) => CupertinoAlertDialog(
+            title: const Text('SafeOn에서\n로그아웃하시겠어요?'),
             actions: [
-              TextButton(
+              CupertinoDialogAction(
+                isDefaultAction: true,
                 onPressed: () => Navigator.of(context).pop(false),
                 child: const Text('취소'),
               ),
-              ElevatedButton(
+              CupertinoDialogAction(
                 onPressed: () => Navigator.of(context).pop(true),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: SafeOnColors.danger,
-                  foregroundColor: Colors.white,
-                ),
                 child: const Text('로그아웃'),
               ),
             ],
