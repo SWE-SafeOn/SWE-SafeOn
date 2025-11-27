@@ -28,11 +28,11 @@ class SafeOnDevice {
 
     return SafeOnDevice(
       id: json['id'] as String? ?? '',
-      name: deviceName ?? 'SafeOn Device',
+      name: deviceName ?? 'SafeOn 디바이스',
       ip: json['ip'] as String? ?? '—',
       macAddress: mac ?? '—',
       discovered: json['discovered'] as bool? ?? false,
-      label: json['label'] as String? ?? deviceName ?? 'SafeOn Device',
+      label: json['label'] as String? ?? deviceName ?? 'SafeOn 디바이스',
       createdAt: json['createdAt'] != null
           ? DateTime.tryParse(json['createdAt'] as String)
           : null,
@@ -42,15 +42,15 @@ class SafeOnDevice {
     );
   }
 
-  String get displayName => name.isNotEmpty ? name : 'SafeOn Device';
+  String get displayName => name.isNotEmpty ? name : 'SafeOn 디바이스';
 
-  String get locationLabel => ip.isNotEmpty ? 'IP: $ip' : 'IP unavailable';
+  String get locationLabel => ip.isNotEmpty ? 'IP: $ip' : 'IP 정보를 불러올 수 없음';
 
   String get status => linkedAt != null
-      ? 'Linked'
+      ? '연결됨'
       : discovered
-          ? 'Discovered'
-          : 'Pending';
+          ? '발견됨'
+          : '대기 중';
 
   bool get isOnline => linkedAt != null || discovered;
 

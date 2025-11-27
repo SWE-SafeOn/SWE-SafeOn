@@ -121,7 +121,7 @@ class _SecurityGraphCardState extends State<SecurityGraphCard> {
                     ),
                     const SizedBox(width: 6),
                     Text(
-                      'Live security pulse',
+                      '실시간 보안 상태',
                       style: theme.textTheme.labelMedium?.copyWith(
                         color: Colors.white,
                         fontWeight: FontWeight.w600,
@@ -223,20 +223,20 @@ class _SecurityGraphCardState extends State<SecurityGraphCard> {
           Column(
             children: [
               _GraphStat(
-                label: 'Active devices',
+                label: '활성 디바이스',
                 value: '${widget.onlineDevices}',
                 chipColor: SafeOnColors.success,
               ),
               const SizedBox(height: 8),
               _GraphStat(
-                label: 'Alerts today',
+                label: '오늘 알림 수',
                 value: '${widget.alertCount}',
                 chipColor: SafeOnColors.accent,
               ),
               const SizedBox(height: 8),
               _GraphStat(
-                label: 'Feed status',
-                value: 'Simulated',
+                label: '피드 상태',
+                value: '시뮬레이션 중',
                 chipColor: colorScheme.secondary,
               ),
             ],

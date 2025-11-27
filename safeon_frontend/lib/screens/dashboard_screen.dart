@@ -26,16 +26,24 @@ extension MotionSensitivityLevelX on MotionSensitivityLevel {
   String get label {
     switch (this) {
       case MotionSensitivityLevel.low:
-        return 'Low';
+        return '낮음';
       case MotionSensitivityLevel.medium:
-        return 'Medium';
+        return '보통';
       case MotionSensitivityLevel.high:
-        return 'High';
+        return '높음';
     }
   }
 
-  String get description =>
-      '$label sensitivity configured for all indoor sensors';
+  String get description {
+    switch (this) {
+      case MotionSensitivityLevel.low:
+        return '모든 실내 센서가 낮은 민감도로 설정됩니다.';
+      case MotionSensitivityLevel.medium:
+        return '모든 실내 센서가 보통 민감도로 설정됩니다.';
+      case MotionSensitivityLevel.high:
+        return '모든 실내 센서가 높은 민감도로 설정됩니다.';
+    }
+  }
 
   Color get color {
     switch (this) {
@@ -195,7 +203,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
             const SizedBox(height: 2),
             Text(
-              'Welcome back, ${_profile.name}',
+              'Welcome, ${_profile.name}',
               style: theme.textTheme.bodyMedium,
             ),
           ],
@@ -204,7 +212,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           IconButton(
             onPressed: _openDiscoveredDevicesSheet,
             icon: const Icon(Icons.add_rounded),
-            tooltip: 'Add device',
+            tooltip: '기기 추가',
           ),
           const SizedBox(width: 8),
           Padding(
@@ -241,19 +249,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
         items: const [
           BottomNavigationBarItem(
             icon: Icon(Icons.home_outlined),
-            label: 'Home',
+            label: '홈',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.warning_amber_rounded),
-            label: 'Alerts',
+            label: '알림',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.devices_other_outlined),
-            label: 'Devices',
+            label: '디바이스',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.person_outline),
-            label: 'Profile',
+            label: '프로필',
           ),
         ],
       ),
@@ -298,7 +306,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               _InsightCard(
                 title: '총 기기 수',
                 value: '$totalDevices',
-                caption: '$onlineDevices online',
+                caption: '온라인 ${onlineDevices}대',
                 icon: Icons.podcasts,
                 accent: SafeOnColors.primary,
                 onTap: () => setState(() => _selectedIndex = 2),
@@ -321,7 +329,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               _InsightCard(
                 title: '최근 알림 수집',
                 value: '${_alerts.length}',
-                caption: '최근 24h 기록',
+                caption: '최근 24시간 기록',
                 icon: Icons.wifi_tethering,
                 accent: SafeOnColors.primaryVariant,
               ),
@@ -329,8 +337,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
           const SizedBox(height: 28),
           SectionHeader(
-            title: 'Featured Devices',
-            actionLabel: 'View all',
+            title: '추천 디바이스',
+            actionLabel: '전체 보기',
             onActionTap: () => setState(() => _selectedIndex = 2),
           ),
           const SizedBox(height: 14),
@@ -365,8 +373,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
           const SizedBox(height: 18),
           SectionHeader(
-            title: 'Latest Alerts',
-            actionLabel: 'See history',
+            title: '최근 알림',
+            actionLabel: '기록 보기',
             onActionTap: () => setState(() => _selectedIndex = 1),
           ),
           const SizedBox(height: 12),
@@ -491,16 +499,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
           ),
           const SizedBox(height: 24),
-          Text('Security preferences', style: theme.textTheme.titleLarge),
+          Text('보안 설정', style: theme.textTheme.titleLarge),
           const SizedBox(height: 12),
           _buildSettingTile(
             icon: _isHomeModeArmed
                 ? Icons.lock_outline
                 : Icons.lock_open_outlined,
-            title: 'Home mode',
+            title: '홈 모드',
             subtitle: _isHomeModeArmed
-                ? 'System armed and monitoring'
-                : 'System disarmed',
+                ? '시스템이 활성화되어 감시 중'
+                : '시스템이 해제되었습니다',
             trailing: Switch(
               value: _isHomeModeArmed,
               onChanged: (value) {
@@ -514,10 +522,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
           _buildSettingTile(
             icon: Icons.lock_clock,
-            title: 'Daily auto-arm',
+            title: '매일 자동 활성화',
             subtitle: _isNightlyAutoArmEnabled
-                ? 'Arms SafeOn everyday'
-                : 'Auto-arm schedule paused',
+                ? 'SafeOn을 매일 자동으로 켜요'
+                : '자동 활성화 일정이 일시 중지됨',
             trailing: Switch(
               value: _isNightlyAutoArmEnabled,
               onChanged: (value) {
@@ -531,7 +539,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
           _buildSettingTile(
             icon: Icons.sensors,
-            title: 'Motion sensitivity',
+            title: '모션 민감도',
             subtitle: _motionSensitivityLevel.description,
             trailing: _MotionSensitivitySelector(
               selectedLevel: _motionSensitivityLevel,
@@ -545,10 +553,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
           _buildSettingTile(
             icon:
                 _isAutomationActive ? Icons.auto_mode : Icons.pause_circle_outline,
-            title: 'Automation routines',
+            title: '자동화 루틴',
             subtitle: _isAutomationActive
-                ? 'Routines running as scheduled'
-                : 'Automation temporarily paused',
+                ? '루틴이 일정대로 실행 중'
+                : '자동화가 일시 중지됨',
             trailing: Switch(
               value: _isAutomationActive,
               onChanged: (value) {
@@ -562,10 +570,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
           _buildSettingTile(
             icon: Icons.notifications_active_outlined,
-            title: 'Push notifications',
+            title: '푸시 알림',
             subtitle: _isPushnotificationsEnabled
-                ? 'Alerts and system updates'
-                : 'Alerts and system turned off',
+                ? '알림 및 시스템 업데이트 수신'
+                : '알림 및 시스템 알림 꺼짐',
             trailing: Switch(
               value: _isPushnotificationsEnabled,
               onChanged: (value) {
@@ -578,7 +586,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
           ),
           const SizedBox(height: 32),
-          Text('Account Management', style: theme.textTheme.titleLarge),
+          Text('계정 관리', style: theme.textTheme.titleLarge),
           const SizedBox(height: 12),
           SizedBox(
             width: double.infinity,
@@ -593,7 +601,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ),
               ),
               icon: const Icon(Icons.logout),
-              label: const Text('Log out'),
+              label: const Text('로그아웃'),
             ),
           ),
         ],
@@ -838,12 +846,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final shouldLogout = await showDialog<bool>(
           context: context,
           builder: (context) => AlertDialog(
-            title: const Text('Log Out?'),
-            content: const Text('Once logged out, you will need to complete the onboarding process again.'),
+            title: const Text('로그아웃하시겠어요?'),
+            content: const Text('로그아웃하면 다시 온보딩 과정을 진행해야 합니다.'),
             actions: [
               TextButton(
                 onPressed: () => Navigator.of(context).pop(false),
-                child: const Text('Cancel'),
+                child: const Text('취소'),
               ),
               ElevatedButton(
                 onPressed: () => Navigator.of(context).pop(true),
@@ -851,7 +859,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   backgroundColor: SafeOnColors.danger,
                   foregroundColor: Colors.white,
                 ),
-                child: const Text('Log out'),
+                child: const Text('로그아웃'),
               ),
             ],
           ),
@@ -966,7 +974,7 @@ class _MotionSensitivitySelector extends StatelessWidget {
     return PopupMenuButton<MotionSensitivityLevel>(
       initialValue: selectedLevel,
       onSelected: onChanged,
-      tooltip: 'Change motion sensitivity',
+      tooltip: '모션 민감도 변경',
       itemBuilder: (context) {
         return MotionSensitivityLevel.values.map((level) {
           final isCurrent = level == selectedLevel;
@@ -1251,7 +1259,7 @@ class _DiscoveredDeviceTile extends StatelessWidget {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        'MAC: ${device.macAddress}',
+                        'MAC 주소: ${device.macAddress}',
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: SafeOnColors.textSecondary,
                         ),

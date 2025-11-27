@@ -51,6 +51,24 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
             ),
             SliverToBoxAdapter(
               child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 4, 20, 8),
+                child: _buildQuickActionsSection(),
+              ),
+            ),
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                child: _buildInsightsSection(),
+              ),
+            ),
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                child: _buildControlsSection(),
+              ),
+            ),
+            SliverToBoxAdapter(
+              child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
                 child: _buildMetaSection(),
               ),
@@ -69,6 +87,7 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
 
   Widget _buildHeroHeader(BuildContext context) {
     final theme = Theme.of(context);
+    final isOnline = widget.device.isOnline;
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -99,8 +118,8 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
                       children: [
                         StatusChip(
                           label: widget.device.status,
-                          icon: widget.device.isOnline ? Icons.check_circle : Icons.error_outline,
-                          color: widget.device.isOnline ? SafeOnColors.success : SafeOnColors.danger,
+                          icon: isOnline ? Icons.check_circle : Icons.error_outline,
+                          color: isOnline ? SafeOnColors.success : SafeOnColors.danger,
                         ),
                       ],
                     ),
@@ -123,11 +142,123 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
               ],
             ),
           ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              _buildSignalChip(widget.device.connectionStrength),
+              const SizedBox(width: 8),
+              _buildBadge(
+                isOnline ? Icons.check_circle_outline : Icons.warning_amber_rounded,
+                isOnline ? '안정 연결' : '연결 확인 필요',
+                color: isOnline ? SafeOnColors.success : SafeOnColors.danger,
+              ),
+            ],
+          ),
         ],
       ),
     );
   }
+
+  Widget _buildQuickActionsSection() {
+    return Row(
+      children: [
+        _buildQuickAction(Icons.play_circle_filled_rounded, '라이브 보기', onTap: () => _showComingSoon('라이브 보기')),
+        const SizedBox(width: 12),
+        _buildQuickAction(Icons.history_rounded, '이벤트 로그', onTap: () => _showComingSoon('이벤트 로그')),
+        const SizedBox(width: 12),
+        _buildQuickAction(Icons.cloud_upload_outlined, '스토리지', onTap: () => _showComingSoon('스토리지 관리')),
+      ],
+    );
+  }
         
+  Widget _buildInsightsSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildSectionTitle('라이브 인사이트'),
+        const SizedBox(height: 8),
+        _buildInsightTile(
+          icon: Icons.timeline,
+          title: '활동 타임라인',
+          description: '최근 24시간 모션 2회 감지 · 이상 징후 없음',
+          actionLabel: '타임라인 열기',
+        ),
+        _buildInsightTile(
+          icon: Icons.cloud_outlined,
+          title: '클라우드 백업',
+          description: '영상이 안전한 SafeOn 클라우드에 동기화 중',
+          actionLabel: '스토리지 관리',
+        ),
+        _buildInsightTile(
+          icon: Icons.sensors_outlined,
+          title: '자동화 루틴',
+          description: '“Night Guard”, “Weekend Away”에 참여 중',
+          actionLabel: '루틴 편집',
+        ),
+      ],
+    );
+  }
+
+  Widget _buildControlsSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildSectionTitle('디바이스 컨트롤'),
+        const SizedBox(height: 8),
+        _buildControlTile(
+          title: '스트리밍',
+          subtitle: _isStreamingEnabled ? '라이브 피드가 활성화되어 있어요' : '라이브 피드를 일시 중지했어요',
+          icon: Icons.play_circle_outline,
+          iconColor: SafeOnColors.primary,
+          trailing: Switch(
+            value: _isStreamingEnabled,
+            onChanged: (value) {
+              setState(() => _isStreamingEnabled = value);
+            },
+            activeThumbColor: SafeOnColors.primary,
+          ),
+        ),
+        _buildControlTile(
+          title: '양방향 오디오',
+          subtitle: _isTwoWayAudioEnabled ? '스피커 응답 가능' : '마이크가 꺼져 있어요',
+          icon: Icons.mic_none_outlined,
+          iconColor: SafeOnColors.warning,
+          trailing: Switch(
+            value: _isTwoWayAudioEnabled,
+            onChanged: (value) {
+              setState(() => _isTwoWayAudioEnabled = value);
+            },
+            activeThumbColor: SafeOnColors.primary,
+          ),
+        ),
+        _buildControlTile(
+          title: '프라이버시 셔터',
+          subtitle: _isPrivacyShutterEnabled ? '가족 도착 시 자동 닫힘' : '셔터가 열려 있어요',
+          icon: Icons.shield_outlined,
+          iconColor: SafeOnColors.success,
+          trailing: Switch(
+            value: _isPrivacyShutterEnabled,
+            onChanged: (value) {
+              setState(() => _isPrivacyShutterEnabled = value);
+            },
+            activeThumbColor: SafeOnColors.primary,
+          ),
+        ),
+        _buildControlTile(
+          title: '재부팅 / 진단',
+          subtitle: '장치 재시작 및 상태 점검',
+          icon: Icons.restart_alt,
+          iconColor: SafeOnColors.textSecondary,
+          trailing: OutlinedButton.icon(
+            onPressed: () {},
+            icon: const Icon(Icons.restart_alt),
+            label: const Text('실행'),
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildMetaSection() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -137,8 +268,8 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
         _buildMetaRow(Icons.wifi, '신호 강도', '${(widget.device.connectionStrength * 100).round()}%'),
         _buildMetaRow(Icons.system_update, '마지막 펌웨어 체크', '오늘 09:12'),
         _buildMetaRow(Icons.language, 'IP 주소', widget.device.ip),
-        _buildMetaRow(Icons.qr_code_2, 'MAC', widget.device.macAddress),
-        _buildMetaRow(Icons.numbers, '시리얼', widget.device.id.isNotEmpty ? widget.device.id : '할당되지 않음'),
+        _buildMetaRow(Icons.qr_code_2, 'MAC 주소', widget.device.macAddress),
+        _buildMetaRow(Icons.numbers, '시리얼 번호', widget.device.id.isNotEmpty ? widget.device.id : '할당되지 않음'),
       ],
     );
   }
@@ -169,6 +300,12 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  void _showComingSoon(String feature) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('$feature 기능이 곧 제공됩니다.')),
     );
   }
 
@@ -275,7 +412,7 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
                 ),
               ),
               TextButton(
-                onPressed: () {},
+                onPressed: () => _showComingSoon(actionLabel),
                 child: Text(actionLabel),
               ),
             ],
@@ -293,7 +430,9 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
   Widget _buildControlTile({
     required String title,
     required String subtitle,
+    required IconData icon,
     required Widget trailing,
+    Color? iconColor,
   }) {
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 8),
@@ -301,6 +440,18 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
       decoration: _cardDecoration(),
       child: Row(
         children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: (iconColor ?? SafeOnColors.primary).withOpacity(0.1),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Icon(
+              icon,
+              color: iconColor ?? SafeOnColors.primary,
+            ),
+          ),
+          const SizedBox(width: 14),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -402,7 +553,6 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
     final gradient = isOnline
         ? const [Color(0xFF1F6FEB), Color(0xFF4F8BFF)]
         : const [Color(0xFFCBD5E1), Color(0xFFE2E8F0)];
-    final accent = isOnline ? SafeOnColors.success : SafeOnColors.warning;
 
     return Stack(
       clipBehavior: Clip.none,
@@ -456,46 +606,6 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
             ),
           ),
         ),
-        Positioned(
-          bottom: -10,
-          right: 0,
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.06),
-                  blurRadius: 14,
-                  offset: const Offset(0, 8),
-                ),
-              ],
-              border: Border.all(color: accent.withOpacity(0.2)),
-            ),
-            child: Row(
-              children: [
-                Container(
-                  height: 8,
-                  width: 8,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: accent,
-                  ),
-                ),
-                const SizedBox(width: 6),
-                Text(
-                  isOnline ? '온라인' : '오프라인',
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                    color: accent,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
       ],
     );
   }
@@ -513,22 +623,23 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
     return _buildBadge(icon, '신호 $percent%');
   }
 
-  Widget _buildBadge(IconData icon, String label) {
+  Widget _buildBadge(IconData icon, String label, {Color? color}) {
+    final badgeColor = color ?? SafeOnColors.primary;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: SafeOnColors.primary.withOpacity(0.08),
+        color: badgeColor.withOpacity(0.08),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 16, color: SafeOnColors.primary),
+          Icon(icon, size: 16, color: badgeColor),
           const SizedBox(width: 6),
           Text(
             label,
-            style: const TextStyle(
-              color: SafeOnColors.primary,
+            style: TextStyle(
+              color: badgeColor,
               fontWeight: FontWeight.w600,
             ),
           ),
@@ -555,15 +666,15 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
   String _deviceTypeLabel(String name) {
     switch (name) {
       case 'camera':
-        return 'Camera';
+        return '카메라';
       case 'hub':
-        return 'Hub';
+        return '허브';
       case 'lock':
-        return 'Lock';
+        return '도어락';
       case 'sensor':
-        return 'Sensor';
+        return '센서';
       default:
-        return 'Device';
+        return '디바이스';
     }
   }
 

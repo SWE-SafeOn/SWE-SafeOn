@@ -38,9 +38,9 @@ class SafeOnAlert {
 
   String get subtitle {
     if (deviceId != null && deviceId!.isNotEmpty) {
-      return 'Device $deviceId · ${status ?? 'Unknown status'}';
+      return '디바이스 $deviceId · ${status ?? '상태 확인 불가'}';
     }
-    return status ?? 'Unknown status';
+    return status ?? '상태 확인 불가';
   }
 }
 
@@ -72,11 +72,11 @@ extension AlertSeverityExtension on AlertSeverity {
   String get label {
     switch (this) {
       case AlertSeverity.low:
-        return 'Low';
+        return '낮음';
       case AlertSeverity.medium:
-        return 'Medium';
+        return '보통';
       case AlertSeverity.high:
-        return 'High';
+        return '높음';
     }
   }
 }
