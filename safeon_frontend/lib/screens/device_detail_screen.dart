@@ -678,48 +678,83 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
   }
 
   String _formatMetric(double value) {
-    if (value < 1) {
-      return value.toStringAsFixed(value < 0.1 ? 2 : 1);
+    const units = ['', 'K', 'M', 'G', 'T'];
+    double absValue = value.abs();
+    int unitIndex = 0;
+
+    while (absValue >= 1000 && unitIndex < units.length - 1) {
+      absValue /= 1000;
+      unitIndex++;
     }
-    return NumberFormat.compact().format(value);
+
+    final formatted = absValue >= 100
+        ? absValue.toStringAsFixed(0)
+        : absValue >= 10
+            ? absValue.toStringAsFixed(1)
+            : absValue.toStringAsFixed(2);
+
+    final prefix = value < 0 ? '-' : '';
+    return '$prefix$formatted${units[unitIndex]}';
   }
 
   Widget _buildLineChart() {
-    final spotsPps = _trafficPoints
-        .map((point) => FlSpot(
-              point.timestamp.millisecondsSinceEpoch.toDouble(),
-              point.pps,
-            ))
-        .toList();
-    final spotsBps = _trafficPoints
-        .map((point) => FlSpot(
-              point.timestamp.millisecondsSinceEpoch.toDouble(),
-              point.bps,
-            ))
-        .toList();
+    List<FlSpot> _anchorSpots(
+      double Function(DeviceTrafficPoint point) selector,
+    ) {
+      if (_trafficPoints.isEmpty) return const [];
+
+      final start = (_trafficWindowStart ?? _trafficPoints.first.timestamp)
+          .millisecondsSinceEpoch
+          .toDouble();
+      final nowMs = DateTime.now().millisecondsSinceEpoch.toDouble();
+
+      final spots = <FlSpot>[
+        FlSpot(start, selector(_trafficPoints.first)),
+        ..._trafficPoints.map(
+          (point) => FlSpot(
+            point.timestamp.millisecondsSinceEpoch.toDouble(),
+            selector(point),
+          ),
+        ),
+      ];
+
+      final last = _trafficPoints.last;
+      final lastMs = last.timestamp.millisecondsSinceEpoch.toDouble();
+      if (nowMs > lastMs) {
+        spots.add(FlSpot(nowMs, selector(last)));
+      }
+
+      return spots;
+    }
+
+    final spotsPps = _anchorSpots((point) => point.pps);
+    final spotsBps = _anchorSpots((point) => point.bps);
 
     if (spotsPps.isEmpty && spotsBps.isEmpty) {
       return const SizedBox.shrink();
     }
 
-    final allX = _trafficPoints
-        .map((point) => point.timestamp.millisecondsSinceEpoch.toDouble())
-        .toList();
+    final allX = [
+      ...spotsPps.map((p) => p.x),
+      ...spotsBps.map((p) => p.x),
+    ];
     final minX = allX.isEmpty ? 0 : allX.reduce(math.min);
     final maxX = allX.isEmpty ? 0 : allX.reduce(math.max);
     final maxYValues = [
       ...spotsPps.map((e) => e.y),
       ...spotsBps.map((e) => e.y),
     ];
-    final maxY = maxYValues.isEmpty ? 0 : maxYValues.reduce(math.max);
+    final double maxY = maxYValues.isEmpty ? 0 : maxYValues.reduce(math.max);
 
     final double rangeX = math.max(maxX - minX, 60000).toDouble(); // at least 1 min span
     final xPadding = rangeX * 0.06;
     final chartMinX = minX - xPadding;
     final chartMaxX = maxX + xPadding;
 
-    final chartMaxY = maxY == 0 ? 1.0 : maxY * 1.25;
-    final yInterval = _niceInterval(chartMaxY).clamp(0.0001, double.infinity).toDouble();
+    final chartMaxY = _niceCeil(maxY);
+    final yInterval = _niceInterval(chartMaxY, targetTickCount: 5)
+        .clamp(0.0001, double.infinity)
+        .toDouble();
     final bottomInterval = _timeInterval(rangeX).clamp(1, double.infinity).toDouble();
 
     String formatTs(double x) {
@@ -784,7 +819,7 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
               showTitles: true,
               reservedSize: 46.0,
               getTitlesWidget: (value, _) => Text(
-                _formatMetric(value),
+                '${_formatMetric(value)}',
                 style: const TextStyle(fontSize: 11, color: SafeOnColors.textSecondary),
               ),
             ),
@@ -864,9 +899,9 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
     );
   }
 
-  double _niceInterval(double maxValue) {
-    if (maxValue <= 1) return 1;
-    final approx = maxValue / 4;
+  double _niceInterval(double maxValue, {int targetTickCount = 4}) {
+    if (maxValue <= 0) return 1;
+    final approx = maxValue / targetTickCount;
     final exponent = (math.log(approx) / math.ln10).floor();
     final magnitude = math.pow(10, exponent).toDouble();
     final residual = approx / magnitude;
@@ -881,6 +916,26 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
     } else {
       nice = 10;
     }
+    return nice * magnitude;
+  }
+
+  double _niceCeil(double maxValue) {
+    if (maxValue <= 0) return 1;
+    final exponent = (math.log(maxValue) / math.ln10).floor();
+    final magnitude = math.pow(10, exponent).toDouble();
+    final residual = maxValue / magnitude;
+
+    double nice;
+    if (residual <= 1) {
+      nice = 1;
+    } else if (residual <= 2) {
+      nice = 2;
+    } else if (residual <= 5) {
+      nice = 5;
+    } else {
+      nice = 10;
+    }
+
     return nice * magnitude;
   }
 

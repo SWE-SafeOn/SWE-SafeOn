@@ -7,7 +7,6 @@ import 'package:intl/intl.dart';
 import '../models/alert.dart';
 import '../models/device.dart';
 import '../models/dashboard_overview.dart';
-import '../models/daily_anomaly_count.dart';
 import '../models/user_profile.dart';
 import '../models/user_session.dart';
 import '../services/safeon_api.dart';
@@ -44,7 +43,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
   DashboardOverview? _overview;
   List<SafeOnDevice> _devices = const [];
   List<SafeOnAlert> _alerts = const [];
-  List<DailyAnomalyCount> _dailyAnomalyCounts = const [];
   final Set<String> _knownAlertIds = {};
   bool _hasLoadedInitialAlerts = false;
   bool _isLoading = true;
@@ -96,24 +94,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
     try {
       final weekStart = _startOfWeek(DateTime.now());
-      final weekEnd = weekStart.add(const Duration(days: 6));
 
       final token = widget.session.token;
       final overview = widget.apiClient.fetchDashboardOverview(token);
       final devices = widget.apiClient.fetchDashboardDevices(token);
       final alerts = widget.apiClient.fetchRecentAlerts(token, limit: 10);
-      final anomalies = widget.apiClient
-          .fetchDailyAnomalyCounts(
-            token,
-            startDate: weekStart,
-            endDate: weekEnd,
-          )
-          .catchError((_) => <DailyAnomalyCount>[]);
       final results = await Future.wait([
         overview,
         devices,
         alerts,
-        anomalies,
       ]);
 
       final fetchedAlerts = results[2] as List<SafeOnAlert>;
@@ -124,7 +113,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
         _overview = results[0] as DashboardOverview;
         _devices = results[1] as List<SafeOnDevice>;
         _alerts = fetchedAlerts;
-        _dailyAnomalyCounts = results[3] as List<DailyAnomalyCount>;
         _currentWeekStart = weekStart;
         _knownAlertIds
           ..clear()
@@ -331,20 +319,26 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return local.subtract(Duration(days: (local.weekday + 6) % 7));
   }
 
-  List<int> get _weeklyAnomalySeries {
+  List<int> get _weeklyAlertSeries {
     final start = _currentWeekStart;
     final end = start.add(const Duration(days: 6));
-    final countsByDay = <int, int>{};
+    final countsByDay = List<int>.filled(7, 0);
 
-    for (final entry in _dailyAnomalyCounts) {
-      final localDate = entry.date.toLocal();
-      final day = DateTime(localDate.year, localDate.month, localDate.day);
+    for (final alert in _alerts) {
+      final ts = alert.timestamp;
+      if (ts == null) continue;
+
+      final local = ts.toLocal();
+      final day = DateTime(local.year, local.month, local.day);
       if (day.isBefore(start) || day.isAfter(end)) continue;
+
       final index = day.difference(start).inDays;
-      countsByDay[index] = (countsByDay[index] ?? 0) + entry.count;
+      if (index >= 0 && index < countsByDay.length) {
+        countsByDay[index] = countsByDay[index] + 1;
+      }
     }
 
-    return List<int>.generate(7, (index) => countsByDay[index] ?? 0);
+    return countsByDay;
   }
 
   @override
@@ -450,7 +444,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final lastAlertLabel = lastAlertTime != null
         ? DateFormat('MM/dd HH:mm').format(lastAlertTime.toLocal())
         : 'None';
-    final weeklyAnomalyCounts = _weeklyAnomalySeries;
+    final weeklyAlertCounts = _weeklyAlertSeries;
 
 
     return SingleChildScrollView(
@@ -463,7 +457,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             name: _profile.name,
             alertCount: alertCount,
             onlineDevices: onlineDevices,
-            weeklyCounts: weeklyAnomalyCounts,
+            weeklyCounts: weeklyAlertCounts,
             weekStartDate: _currentWeekStart,
           ),
           const SizedBox(height: 22),
