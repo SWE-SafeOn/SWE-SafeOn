@@ -50,7 +50,8 @@ class MQTTBridge:
     def from_env(cls, model_service: ModelService) -> "MQTTBridge":
         """Build the bridge using environment overrides."""
 
-        host = os.getenv("MQTT_HOST", "localhost")
+        # Default broker aligned with backend config in application.yml
+        host = os.getenv("MQTT_HOST", "192.168.0.103")
         port = int(os.getenv("MQTT_PORT", "1883"))
         username = os.getenv("MQTT_USERNAME", "safeon")
         password = os.getenv("MQTT_PASSWORD", "1234!")
