@@ -1,5 +1,5 @@
 # SafeOn
-**The Anomaly Detection Framework for Smart Home IoT Security With Digtal Twin**
+**The Anomaly Detection Framework for Smart Home IoT Security**
 
 ---
 
