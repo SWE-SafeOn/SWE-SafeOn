@@ -86,9 +86,19 @@ preprocessing as needed.
 
 ## Training with the bundled dataset
 
-```
-python -m app.train --dataset ../datasets/esp32-cam/esp32_500_dataset.csv
-```
+1. (Optional) Rebuild the dataset with the new win3 captures:
+
+   ```
+   python ../datasets/esp32-cam/combine.py
+   ```
+
+   This produces `../datasets/esp32-cam/esp32_win3_dataset.csv`.
+
+2. Train the models:
+
+   ```
+   python -m app.train --dataset ../datasets/esp32-cam/esp32_win3_dataset.csv
+   ```
 
 Artifacts (encoders, scaler, IsolationForest, Transformer autoencoder) are
 written to `safeon_ML-FastAPI/models`. Subsequent `/predict` calls will load

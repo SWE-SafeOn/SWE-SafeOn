@@ -31,7 +31,7 @@ logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO"))
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 APP_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_MODEL_DIR = APP_ROOT / "models"
-DEFAULT_DATASET = PROJECT_ROOT / "datasets" / "esp32-cam" / "esp32_500_dataset.csv"
+DEFAULT_DATASET = PROJECT_ROOT / "datasets" / "esp32-cam" / "esp32_win3_dataset.csv"
 DEFAULT_DB_URL = os.getenv(
     "DATABASE_URL", "postgresql://safeon:0987@localhost:5432/safeon"
 )
@@ -354,8 +354,8 @@ class ModelService:
             "ae_score": ae_score,
             "hybrid_score": hybrid_score,
             "received_at": ts,
-            "anomaly_score_id": str(record_id) if record_id else None,
             "persisted": bool(record_id),
+            "anomaly_score_id": str(record_id) if record_id else None,
         }
 
     # ---------------------------------------------------
@@ -491,6 +491,6 @@ class ModelService:
             "ae_score": 0.0,
             "hybrid_score": 0.0,
             "received_at": ts,
-            "anomaly_score_id": None,
             "persisted": False,
+            "anomaly_score_id": None,
         }

@@ -31,8 +31,8 @@ class PredictionResponse(BaseModel):
     iso_score: float
     ae_score: float
     hybrid_score: float
-    anomaly_score_id: Optional[str] = None
     persisted: bool
+    anomaly_score_id: Optional[str] = None
     received_at: datetime
 
 
