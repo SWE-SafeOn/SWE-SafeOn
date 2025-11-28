@@ -51,7 +51,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
   String? _errorMessage;
   bool _isNightlyAutoArmEnabled = true;
   bool _isHomeModeArmed = true;
-  bool _isAutomationActive = true;
   bool _isPushnotificationsEnabled = true;
   bool _isUpdatingPushNotifications = false;
   bool _isUpdatingHomeMode = false;
@@ -686,7 +685,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
             trailing: Switch(
               value: _isHomeModeArmed,
               onChanged: _isUpdatingHomeMode ? null : _handleHomeModeToggle,
-              activeColor: SafeOnColors.primary,
               activeThumbColor: SafeOnColors.primary,
               activeTrackColor: SafeOnColors.primary.withValues(alpha: 0.3),
             ),
@@ -702,24 +700,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
               onChanged: (value) {
                 setState(() {
                   _isNightlyAutoArmEnabled = value;
-                });
-              },
-              activeThumbColor: SafeOnColors.primary,
-              activeTrackColor: SafeOnColors.primary.withValues(alpha: 0.3),
-            ),
-          ),
-          _buildSettingTile(
-            icon:
-                _isAutomationActive ? Icons.auto_mode : Icons.pause_circle_outline,
-            title: '자동화 루틴',
-            subtitle: _isAutomationActive
-                ? '루틴이 일정대로 실행 중'
-                : '자동화가 일시 중지',
-            trailing: Switch(
-              value: _isAutomationActive,
-              onChanged: (value) {
-                setState(() {
-                  _isAutomationActive = value;
                 });
               },
               activeThumbColor: SafeOnColors.primary,
