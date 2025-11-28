@@ -76,7 +76,7 @@ CREATE TABLE anomaly_scores (
     packet_meta_id UUID UNIQUE,
     alert_id UUID,
     iso_score DOUBLE PRECISION,
-    lstm_score DOUBLE PRECISION,
+    ae_score DOUBLE PRECISION,
     hybrid_score DOUBLE PRECISION,
     is_anom BOOLEAN
 );
