@@ -13,7 +13,9 @@ from app.model import ModelService
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Train SafeOn models on the provided dataset.")
-    # CLI 인자로 데이터셋과 하이퍼파라미터를 덮어써서 빠르게 실험할 수 있도록 한다.
+    # CLI 인자(--dataset같은 --로 시작하는 옵션)로 데이터셋과
+    # 하이퍼파라미터(모델학습에 미리 정해두는 설정값, 코드가 스스로 학습하지 않는 수치를 말함 ex. --epochs or --batch-size)
+    # 를 덮어써서 빠르게 실험할 수 있도록 한다.
     parser.add_argument(
         "--dataset",
         type=Path,
