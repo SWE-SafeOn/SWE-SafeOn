@@ -54,6 +54,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   bool _isAutomationActive = true;
   bool _isPushnotificationsEnabled = true;
   bool _isUpdatingPushNotifications = false;
+  bool _isUpdatingHomeMode = false;
   Timer? _alertPollingTimer;
   static const Duration _alertPollingInterval = Duration(seconds: 30);
   bool _isPollingAlerts = false;
@@ -239,6 +240,47 @@ class _DashboardScreenState extends State<DashboardScreen> {
           .map((item) => item.id == alert.id ? item.copyWith(read: true) : item)
           .toList();
     });
+  }
+
+  Future<void> _handleHomeModeToggle(bool enable) async {
+    if (_isUpdatingHomeMode) return;
+
+    setState(() {
+      _isUpdatingHomeMode = true;
+    });
+
+    final previous = _isHomeModeArmed;
+    setState(() => _isHomeModeArmed = enable);
+
+    try {
+      if (enable) {
+        await widget.apiClient.enableMlModel(widget.session.token);
+      } else {
+        await widget.apiClient.disableMlModel(widget.session.token);
+      }
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      setState(() => _isHomeModeArmed = previous);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.message)),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _isHomeModeArmed = previous);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            enable ? 'ML 모델을 켜지 못했어요. 다시 시도해주세요.' : 'ML 모델을 끄지 못했어요. 다시 시도해주세요.',
+          ),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isUpdatingHomeMode = false;
+        });
+      }
+    }
   }
 
   Future<void> _handlePushNotificationToggle(bool enable) async {
@@ -643,11 +685,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 : '시스템이 해제되었습니다',
             trailing: Switch(
               value: _isHomeModeArmed,
-              onChanged: (value) {
-                setState(() {
-                  _isHomeModeArmed = value;
-                });
-              },
+              onChanged: _isUpdatingHomeMode ? null : _handleHomeModeToggle,
+              activeColor: SafeOnColors.primary,
               activeThumbColor: SafeOnColors.primary,
               activeTrackColor: SafeOnColors.primary.withValues(alpha: 0.3),
             ),
