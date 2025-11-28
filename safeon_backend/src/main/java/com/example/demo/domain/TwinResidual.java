@@ -22,9 +22,6 @@ public class TwinResidual {
 
     private OffsetDateTime ts;
 
-    @Column(name = "flow_id")
-    private UUID flow;
-
     @Column(name = "twin_ver")
     private String twinVer;
 

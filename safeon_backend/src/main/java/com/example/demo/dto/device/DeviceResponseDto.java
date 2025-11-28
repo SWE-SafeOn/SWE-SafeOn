@@ -14,6 +14,7 @@ public record DeviceResponseDto(
         String name,
         String ip,
         Boolean discovered,
+        String status,
         String createdAt,
         String linkedAt
 ) {
@@ -38,6 +39,7 @@ public record DeviceResponseDto(
                 .name(device.getName())
                 .ip(device.getIp())
                 .discovered(device.getDiscovered())
+                .status(device.getStatus())
                 .createdAt(device.getCreatedAt() != null ? device.getCreatedAt().toString() : null)
                 .linkedAt(linkedAt)
                 .build();

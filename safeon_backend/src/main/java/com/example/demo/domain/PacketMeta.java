@@ -20,9 +20,6 @@ public class PacketMeta {
     @Column(name = "packet_meta_id")
     private UUID packetMetaId;
 
-    @Column(name = "flow_id")
-    private UUID flow;
-
     @Column(name = "src_ip")
     private String srcIp;
 
@@ -30,10 +27,10 @@ public class PacketMeta {
     private String dstIp;
 
     @Column(name = "src_port")
-    private Short srcPort;
+    private Integer srcPort;
 
     @Column(name = "dst_port")
-    private Short dstPort;
+    private Integer dstPort;
 
     @Column(name = "proto")
     private String proto;
@@ -58,7 +55,5 @@ public class PacketMeta {
     private Double pps;
 
     private Double bps;
-
-    private Integer label;
 
 }

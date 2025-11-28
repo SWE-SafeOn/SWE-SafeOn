@@ -33,12 +33,16 @@ public class Device {
     @Column(name = "created_at")
     private OffsetDateTime createdAt;
 
+    @Column(name = "status")
+    private String status;
+
     public static Device create(
             String macAddress,
             String name,
             String ip,
             Boolean discovered,
-            OffsetDateTime createdAt
+            OffsetDateTime createdAt,
+            String status
     ) {
         Device device = new Device();
         device.macAddress = macAddress;
@@ -46,10 +50,19 @@ public class Device {
         device.ip = ip;
         device.discovered = discovered;
         device.createdAt = createdAt;
+        device.status = status;
         return device;
     }
 
     public void updateDiscovered(Boolean discovered) {
         this.discovered = discovered;
+    }
+
+    public void updateStatus(String status) {
+        this.status = status;
+    }
+
+    public void updateIp(String ip) {
+        this.ip = ip;
     }
 }

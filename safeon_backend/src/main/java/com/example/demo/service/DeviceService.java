@@ -58,12 +58,14 @@ public class DeviceService {
 
     @Transactional
     public DeviceResponseDto createDiscoveredDevice(DeviceDiscoveryRequestDto request) {
+        String status = request.getStatus() != null ? request.getStatus() : "connect";
         Device device = Device.create(
                 request.getMacAddress(),
                 request.getName(),
                 request.getIp(),
                 false,
-                OffsetDateTime.now()
+                OffsetDateTime.now(),
+                status
         );
         Device saved = deviceRepository.save(device);
         return DeviceResponseDto.from(saved, null);
