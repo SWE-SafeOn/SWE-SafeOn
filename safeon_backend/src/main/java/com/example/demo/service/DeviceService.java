@@ -49,8 +49,17 @@ public class DeviceService {
     }
 
     @Transactional(readOnly = true)
+    public List<DeviceResponseDto> getDevicesByStatus(UUID userId, String status) {
+        return userDeviceRepository.findAllByUserUserIdAndDeviceDiscoveredAndDeviceStatus(userId, true, status)
+                .stream()
+                .map(DeviceResponseDto::from)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
     public List<DeviceResponseDto> getDevicesByDiscovered(boolean discovered) {
-        return deviceRepository.findAllByDiscovered(discovered)
+        // Discovery 목록 조회 시 현재 연결된(connect) 디바이스만 노출
+        return deviceRepository.findAllByDiscoveredAndStatus(discovered, "connect")
                 .stream()
                 .map(device -> DeviceResponseDto.from(device, null))
                 .toList();

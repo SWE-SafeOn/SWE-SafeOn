@@ -39,7 +39,7 @@ public class DashboardService {
     @Transactional(readOnly = true)
     public DashboardOverviewDto getOverview(UUID userId) {
         long totalDevices = userDeviceRepository.countByUserUserId(userId);
-        long onlineDevices = totalDevices;
+        long onlineDevices = userDeviceRepository.countByUserUserIdAndDeviceDiscoveredTrueAndDeviceStatus(userId, "connect");
         long alertCount = userAlertRepository.countByUserUserId(userId);
         UserAlert lastAlert = userAlertRepository
                 .findFirstByUserUserIdOrderByNotifiedAtDesc(userId)

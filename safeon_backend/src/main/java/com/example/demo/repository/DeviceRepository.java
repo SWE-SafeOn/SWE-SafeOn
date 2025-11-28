@@ -14,6 +14,8 @@ public interface DeviceRepository extends JpaRepository<Device, UUID> {
 
     java.util.List<Device> findAllByDiscovered(Boolean discovered);
 
+    java.util.List<Device> findAllByDiscoveredAndStatus(Boolean discovered, String status);
+
     Optional<Device> findByMacAddress(String macAddress);
 
     default Device getByDeviceId(UUID deviceId) {
