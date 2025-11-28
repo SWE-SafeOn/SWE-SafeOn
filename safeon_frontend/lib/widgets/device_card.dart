@@ -57,11 +57,11 @@ class DeviceCard extends StatelessWidget {
                     TextButton.icon(
                       onPressed: isBlocking ? null : onBlock,
                       style: TextButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                        visualDensity: VisualDensity.compact,
-                        foregroundColor: SafeOnColors.danger,
-                        minimumSize: Size.zero,
-                      ),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    visualDensity: VisualDensity.compact,
+                    foregroundColor: SafeOnColors.danger,
+                    minimumSize: Size.zero,
+                  ),
                       icon: isBlocking
                           ? const SizedBox(
                               width: 14,
@@ -69,10 +69,7 @@ class DeviceCard extends StatelessWidget {
                               child: CircularProgressIndicator(strokeWidth: 2, color: SafeOnColors.danger),
                             )
                           : const Icon(Icons.block, size: 18),
-                      label: const Text(
-                        '지우기',
-                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-                      ),
+                      label: const Text('차단하기', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
                     ),
                     const SizedBox(width: 6),
                   ],

@@ -98,7 +98,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
   List<DailyAnomalyCount> _dailyAnomalyCounts = const [];
   final Set<String> _knownAlertIds = {};
   bool _hasLoadedInitialAlerts = false;
-  final Set<String> _blockingDeviceIds = {};
   bool _isLoading = true;
   String? _errorMessage;
   bool _isNightlyAutoArmEnabled = true;
@@ -311,77 +310,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
 
     return List<int>.generate(7, (index) => countsByDay[index] ?? 0);
-  }
-
-  Future<void> _confirmBlockDevice(SafeOnDevice device) async {
-    if (device.id.isEmpty || device.macAddress.isEmpty || device.macAddress == '—') {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('기기 정보가 부족해 차단할 수 없습니다.')),
-      );
-      return;
-    }
-
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('디바이스 차단'),
-        content: Text('"${device.displayName}"을(를) 차단하고 목록에서 숨길까요?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: const Text('취소'),
-          ),
-          FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: SafeOnColors.danger),
-            onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: const Text('차단'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed == true) {
-      await _blockDevice(device);
-    }
-  }
-
-  Future<void> _blockDevice(SafeOnDevice device) async {
-    if (_blockingDeviceIds.contains(device.id)) return;
-
-    setState(() {
-      _blockingDeviceIds.add(device.id);
-    });
-
-    try {
-      await widget.apiClient.blockDevice(
-        token: widget.session.token,
-        deviceId: device.id,
-        macAddress: device.macAddress,
-        ip: device.ip == '—' ? null : device.ip,
-        name: device.name,
-      );
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${device.displayName} 차단 요청을 보냈어요.')),
-      );
-      await _loadDashboard();
-    } on ApiException catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.message)),
-      );
-    } catch (_) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('디바이스 차단 중 오류가 발생했습니다. 다시 시도해주세요.')),
-      );
-    } finally {
-      if (mounted) {
-        setState(() {
-          _blockingDeviceIds.remove(device.id);
-        });
-      }
-    }
   }
 
   @override
@@ -1250,6 +1178,7 @@ class _DiscoveredDeviceSheet extends StatefulWidget {
 class _DiscoveredDeviceSheetState extends State<_DiscoveredDeviceSheet> {
   late Future<List<SafeOnDevice>> _discoveredDevicesFuture;
   final Set<String> _claimingDeviceIds = {};
+  final Set<String> _blockingDeviceIds = {};
 
   @override
   void initState() {
@@ -1263,6 +1192,77 @@ class _DiscoveredDeviceSheetState extends State<_DiscoveredDeviceSheet> {
       _discoveredDevicesFuture =
           widget.apiClient.fetchDiscoveredDevices(widget.token);
     });
+  }
+
+  Future<void> _confirmBlockDevice(SafeOnDevice device) async {
+    if (device.id.isEmpty || device.macAddress.isEmpty || device.macAddress == '—') {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('기기 정보가 부족해 차단할 수 없습니다.')),
+      );
+      return;
+    }
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => CupertinoAlertDialog(
+        title: const Text('디바이스 차단'),
+        content: Text('"${device.displayName}"을(를) 차단할까요?'),
+        actions: [
+          CupertinoDialogAction(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('취소'),
+          ),
+          CupertinoDialogAction(
+            isDestructiveAction: true,
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('차단'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      await _blockDevice(device);
+    }
+  }
+
+  Future<void> _blockDevice(SafeOnDevice device) async {
+    if (_blockingDeviceIds.contains(device.id)) return;
+
+    setState(() {
+      _blockingDeviceIds.add(device.id);
+    });
+
+    try {
+      await widget.apiClient.blockDevice(
+        token: widget.token,
+        deviceId: device.id,
+        macAddress: device.macAddress,
+        ip: device.ip == '—' ? null : device.ip,
+        name: device.name,
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('${device.displayName} 차단 요청을 보냈어요.')),
+      );
+      _retryFetch();
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.message)),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('디바이스 차단 중 오류가 발생했습니다. 다시 시도해주세요.')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _blockingDeviceIds.remove(device.id);
+        });
+      }
+    }
   }
 
   Future<void> _claimDevice(SafeOnDevice device) async {
@@ -1383,10 +1383,14 @@ class _DiscoveredDeviceSheetState extends State<_DiscoveredDeviceSheet> {
                           final device = devices[index];
                           final isClaiming =
                               _claimingDeviceIds.contains(device.id);
+                          final isBlocking =
+                              _blockingDeviceIds.contains(device.id);
                           return _DiscoveredDeviceTile(
                             device: device,
                             isClaiming: isClaiming,
+                            isBlocking: isBlocking,
                             onClaim: () => _claimDevice(device),
+                            onBlock: () => _confirmBlockDevice(device),
                           );
                         },
                       );
@@ -1407,11 +1411,15 @@ class _DiscoveredDeviceTile extends StatelessWidget {
     required this.device,
     required this.onClaim,
     required this.isClaiming,
+    required this.onBlock,
+    required this.isBlocking,
   });
 
   final SafeOnDevice device;
   final VoidCallback onClaim;
   final bool isClaiming;
+  final VoidCallback onBlock;
+  final bool isBlocking;
 
   @override
   Widget build(BuildContext context) {
@@ -1461,6 +1469,26 @@ class _DiscoveredDeviceTile extends StatelessWidget {
                         ),
                       ),
                     ],
+                  ),
+                ),
+                TextButton.icon(
+                  onPressed: isBlocking ? null : onBlock,
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                    visualDensity: VisualDensity.compact,
+                    minimumSize: Size.zero,
+                    foregroundColor: SafeOnColors.danger,
+                  ),
+                  icon: isBlocking
+                      ? const SizedBox(
+                          width: 14,
+                          height: 14,
+                          child: CircularProgressIndicator(strokeWidth: 2, color: SafeOnColors.danger),
+                        )
+                      : const Icon(Icons.block, size: 16),
+                  label: const Text(
+                    '차단하기',
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
                   ),
                 ),
               ],
