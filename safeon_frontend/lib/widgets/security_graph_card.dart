@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 import '../theme/app_theme.dart';
 
-const _securityGraphCounts = <int>[24, 18, 32, 28, 36, 22, 14]; // 추후 백엔드 반영
 const _weekdaySymbolsKo = ['월', '화', '수', '목', '금', '토', '일'];
 
 class SecurityGraphCard extends StatefulWidget {
@@ -11,11 +10,15 @@ class SecurityGraphCard extends StatefulWidget {
     required this.name,
     required this.alertCount,
     required this.onlineDevices,
+    required this.weeklyCounts,
+    required this.weekStartDate,
   });
 
   final String name;
   final int alertCount;
   final int onlineDevices;
+  final List<int> weeklyCounts;
+  final DateTime weekStartDate;
 
   @override
   State<SecurityGraphCard> createState() => _SecurityGraphCardState();
@@ -27,16 +30,30 @@ class _SecurityGraphCardState extends State<SecurityGraphCard> {
   double? _graphWidth;
   _WeekContext? _cachedWeekContext;
 
+  List<int> get _points =>
+      widget.weeklyCounts.isNotEmpty ? widget.weeklyCounts : List<int>.filled(7, 0);
+
   _WeekContext get _weekContext =>
-      _cachedWeekContext ??= _WeekContext.fromDate(DateTime.now());
+      _cachedWeekContext ??= _WeekContext.fromDate(widget.weekStartDate);
+
+  @override
+  void didUpdateWidget(covariant SecurityGraphCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.weekStartDate != widget.weekStartDate) {
+      _cachedWeekContext = null;
+    }
+  }
 
   void _updateGraphWidth(double width) {
     _graphWidth = width;
   }
 
   void _updateHover(double dx, double width) {
-    final step = width / (_securityGraphCounts.length - 1);
-    final index = (dx / step).round().clamp(0, _securityGraphCounts.length - 1);
+    final points = _points;
+    if (points.length < 2) return;
+
+    final step = width / (points.length - 1);
+    final index = (dx / step).round().clamp(0, points.length - 1);
 
     setState(() {
       _hoveredIndex = index;
@@ -55,14 +72,15 @@ class _SecurityGraphCardState extends State<SecurityGraphCard> {
 
   void _jumpToDay(int index) {
     final width = _graphWidth;
-    if (width == null || _securityGraphCounts.isEmpty) return;
+    final points = _points;
+    if (width == null || points.isEmpty || points.length < 2) return;
 
     if (_hoveredIndex == index) {
       _clearHover();
       return;
     }
 
-    final step = width / (_securityGraphCounts.length - 1);
+    final step = width / (points.length - 1);
     final dx = step * index;
     _updateHover(dx, width);
   }
@@ -71,7 +89,8 @@ class _SecurityGraphCardState extends State<SecurityGraphCard> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final points = _securityGraphCounts;
+    final points = _points;
+    final weeklyTotal = points.fold<int>(0, (sum, value) => sum + value);
 
     return Container(
       width: double.infinity,
@@ -187,7 +206,7 @@ class _SecurityGraphCardState extends State<SecurityGraphCard> {
                             padding: const EdgeInsets.fromLTRB(12, 8, 12, 10),
                             alignment: Alignment.bottomLeft,
                             child: Text(
-                              'SafeOn Detection Count',
+                              '주간 이상 탐지 횟수',
                               style: theme.textTheme.labelMedium?.copyWith(
                                 color: Colors.white70,
                                 fontWeight: FontWeight.w500,
@@ -229,14 +248,14 @@ class _SecurityGraphCardState extends State<SecurityGraphCard> {
               ),
               const SizedBox(height: 8),
               _GraphStat(
-                label: '오늘 알림 수',
-                value: '${widget.alertCount}',
+                label: '주간 이상 탐지',
+                value: '$weeklyTotal',
                 chipColor: SafeOnColors.accent,
               ),
               const SizedBox(height: 8),
               _GraphStat(
-                label: '피드 상태',
-                value: '시뮬레이션 중',
+                label: '누적 알림',
+                value: '${widget.alertCount}',
                 chipColor: colorScheme.secondary,
               ),
             ],

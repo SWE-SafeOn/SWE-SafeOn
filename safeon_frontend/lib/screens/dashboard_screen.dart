@@ -8,6 +8,7 @@ import 'package:intl/intl.dart';
 import '../models/alert.dart';
 import '../models/device.dart';
 import '../models/dashboard_overview.dart';
+import '../models/daily_anomaly_count.dart';
 import '../models/user_profile.dart';
 import '../models/user_session.dart';
 import '../services/safeon_api.dart';
@@ -94,6 +95,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   DashboardOverview? _overview;
   List<SafeOnDevice> _devices = const [];
   List<SafeOnAlert> _alerts = const [];
+  List<DailyAnomalyCount> _dailyAnomalyCounts = const [];
   final Set<String> _knownAlertIds = {};
   bool _hasLoadedInitialAlerts = false;
   final Set<String> _blockingDeviceIds = {};
@@ -104,12 +106,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
   bool _isAutomationActive = true;
   MotionSensitivityLevel _motionSensitivityLevel = MotionSensitivityLevel.medium;
   bool _isPushnotificationsEnabled = true;
+  late DateTime _currentWeekStart;
   
 
   @override
   void initState() {
     super.initState();
     _profile = widget.session.profile;
+    _currentWeekStart = _startOfWeek(DateTime.now());
     _loadDashboard();
   }
 
@@ -133,14 +137,25 @@ class _DashboardScreenState extends State<DashboardScreen> {
     });
 
     try {
+      final weekStart = _startOfWeek(DateTime.now());
+      final weekEnd = weekStart.add(const Duration(days: 6));
+
       final token = widget.session.token;
       final overview = widget.apiClient.fetchDashboardOverview(token);
       final devices = widget.apiClient.fetchDashboardDevices(token);
       final alerts = widget.apiClient.fetchRecentAlerts(token, limit: 10);
+      final anomalies = widget.apiClient
+          .fetchDailyAnomalyCounts(
+            token,
+            startDate: weekStart,
+            endDate: weekEnd,
+          )
+          .catchError((_) => <DailyAnomalyCount>[]);
       final results = await Future.wait([
         overview,
         devices,
         alerts,
+        anomalies,
       ]);
 
       final fetchedAlerts = results[2] as List<SafeOnAlert>;
@@ -151,6 +166,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
         _overview = results[0] as DashboardOverview;
         _devices = results[1] as List<SafeOnDevice>;
         _alerts = fetchedAlerts;
+        _dailyAnomalyCounts = results[3] as List<DailyAnomalyCount>;
+        _currentWeekStart = weekStart;
         _knownAlertIds
           ..clear()
           ..addAll(fetchedAlerts.map((alert) => alert.id));
@@ -215,6 +232,26 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return fetchedAlerts
         .where((alert) => !_knownAlertIds.contains(alert.id))
         .toList();
+  }
+
+  DateTime _startOfWeek(DateTime date) {
+    final local = DateTime(date.year, date.month, date.day);
+    return local.subtract(Duration(days: (local.weekday + 6) % 7));
+  }
+
+  List<int> get _weeklyAnomalySeries {
+    final start = _currentWeekStart;
+    final end = start.add(const Duration(days: 6));
+    final countsByDay = <int, int>{};
+
+    for (final entry in _dailyAnomalyCounts) {
+      final day = DateTime(entry.date.year, entry.date.month, entry.date.day);
+      if (day.isBefore(start) || day.isAfter(end)) continue;
+      final index = day.difference(start).inDays;
+      countsByDay[index] = (countsByDay[index] ?? 0) + entry.count;
+    }
+
+    return List<int>.generate(7, (index) => countsByDay[index] ?? 0);
   }
 
   Future<void> _confirmBlockDevice(SafeOnDevice device) async {
@@ -391,6 +428,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final lastAlertLabel = lastAlertTime != null
         ? DateFormat('MM/dd HH:mm').format(lastAlertTime.toLocal())
         : 'None';
+    final weeklyAnomalyCounts = _weeklyAnomalySeries;
+    final weeklyAnomalyTotal =
+        weeklyAnomalyCounts.fold<int>(0, (sum, count) => sum + count);
 
 
     return SingleChildScrollView(
@@ -403,6 +443,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
             name: _profile.name,
             alertCount: alertCount,
             onlineDevices: onlineDevices,
+            weeklyCounts: weeklyAnomalyCounts,
+            weekStartDate: _currentWeekStart,
           ),
           const SizedBox(height: 22),
           Wrap(
@@ -438,6 +480,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 caption: '최근 24시간 기록',
                 icon: Icons.wifi_tethering,
                 accent: SafeOnColors.primaryVariant,
+              ),
+              _InsightCard(
+                title: '주간 이상 탐지',
+                value: '$weeklyAnomalyTotal',
+                caption: '이번주 요일별 감지 횟수',
+                icon: Icons.graphic_eq,
+                accent: SafeOnColors.accent,
               ),
             ],
           ),

@@ -4,9 +4,12 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 import '../models/alert.dart';
+import 'package:intl/intl.dart';
+
 import '../models/dashboard_overview.dart';
 import '../models/device.dart';
 import '../models/user_profile.dart';
+import '../models/daily_anomaly_count.dart';
 
 class ApiException implements Exception {
   ApiException(this.message, [this.statusCode]);
@@ -317,5 +320,37 @@ class SafeOnApiClient {
       return data['message'] as String? ?? data['error'] as String?;
     }
     return null;
+  }
+
+  Future<List<DailyAnomalyCount>> fetchDailyAnomalyCounts(
+    String token, {
+    DateTime? startDate,
+    DateTime? endDate,
+  }) async {
+    final formatter = DateFormat('yyyy-MM-dd');
+    final query = <String, dynamic>{
+      if (startDate != null) 'startDate': formatter.format(startDate),
+      if (endDate != null) 'endDate': formatter.format(endDate),
+    };
+
+    final response = await _httpClient.get(
+      _uri('/dashboard/anomalies/daily', query.isEmpty ? null : query),
+      headers: _jsonHeaders(token: token),
+    );
+
+    final body = _decode(response);
+    if (response.statusCode == 200 && body['data'] != null) {
+      final data = body['data'] as Map<String, dynamic>;
+      final items = data['data'] as List<dynamic>? ?? [];
+      return items
+          .map((item) =>
+              DailyAnomalyCount.fromJson(item as Map<String, dynamic>))
+          .toList();
+    }
+
+    throw ApiException(
+      _extractError(body) ?? '이상 탐지 집계를 불러올 수 없습니다.',
+      response.statusCode,
+    );
   }
 }
