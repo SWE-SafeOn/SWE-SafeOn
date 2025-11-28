@@ -131,11 +131,9 @@ public class DeviceService {
         }
 
         BlockDevicePayload payload = new BlockDevicePayload(
-                deviceId,
                 request.getMacAddress(),
                 resolveIp(request, device),
-                resolveName(request, device),
-                userId.toString()
+                resolveName(request, device)
         );
 
         try {
@@ -162,11 +160,9 @@ public class DeviceService {
     }
 
     private record BlockDevicePayload(
-            String deviceId,
             String macAddress,
             String ip,
-            String name,
-            String requestedBy
+            String name
     ) {}
 
     private UserDevice getUserDevice(String deviceId, UUID userId) {
