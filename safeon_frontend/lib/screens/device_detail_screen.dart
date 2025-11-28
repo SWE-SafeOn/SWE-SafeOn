@@ -1,3 +1,6 @@
+import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
 import 'dart:math' as math;
 
 import 'package:fl_chart/fl_chart.dart';
@@ -32,11 +35,21 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
   bool _isLoadingTraffic = false;
   String? _trafficError;
   List<DeviceTrafficPoint> _trafficPoints = [];
+  WebSocket? _trafficSocket;
+  StreamSubscription<dynamic>? _trafficSubscription;
+  DateTime? _trafficWindowStart;
+  bool _isConnectingTraffic = false;
 
   @override
   void initState() {
     super.initState();
-    _loadTraffic();
+    _connectTrafficStream();
+  }
+
+  @override
+  void dispose() {
+    _closeTrafficStream();
+    super.dispose();
   }
 
   @override
@@ -179,7 +192,7 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
             Text(_trafficError!, style: const TextStyle(color: SafeOnColors.danger)),
             const SizedBox(height: 8),
             TextButton(
-              onPressed: _loadTraffic,
+              onPressed: _connectTrafficStream,
               child: const Text('다시 불러오기'),
             ),
           ],
@@ -197,7 +210,7 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
             ),
             const SizedBox(height: 8),
             TextButton(
-              onPressed: _loadTraffic,
+              onPressed: _connectTrafficStream,
               child: const Text('새로고침'),
             ),
           ],
@@ -212,6 +225,20 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
             height: 240,
             child: _buildLineChart(),
           ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 14,
+            runSpacing: 8,
+            children: [
+              _buildLegendDot(SafeOnColors.primary, 'PPS (packet/s)'),
+              _buildLegendDot(SafeOnColors.accent, 'BPS (byte/s)'),
+              if (_trafficWindowStart != null)
+                Text(
+                  '기준: ${DateFormat('HH:mm').format(_trafficWindowStart!.toLocal())} ~ ${DateFormat('HH:mm').format(DateTime.now().toLocal())}',
+                  style: const TextStyle(color: SafeOnColors.textSecondary, fontSize: 12),
+                ),
+            ],
+          ),
         ],
       );
     }
@@ -219,7 +246,7 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildSectionTitle('트래픽 추이'),
+        _buildSectionTitle('최근 1시간 트래픽 추이'),
         const SizedBox(height: 8),
         Container(
           padding: const EdgeInsets.all(16),
@@ -330,14 +357,18 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
     }
   }
 
-  Future<void> _loadTraffic() async {
+  Future<void> _connectTrafficStream() async {
     if (widget.device.id.isEmpty) {
       setState(() {
         _trafficPoints = [];
         _trafficError = '디바이스 ID가 없어 트래픽을 불러올 수 없습니다.';
+        _isLoadingTraffic = false;
       });
       return;
     }
+
+    if (_isConnectingTraffic) return;
+    _isConnectingTraffic = true;
 
     setState(() {
       _isLoadingTraffic = true;
@@ -345,32 +376,107 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
     });
 
     try {
-      final data = await widget.apiClient.fetchDeviceTraffic(
-        token: widget.token,
+      await _closeTrafficStream();
+      final uri = widget.apiClient.deviceTrafficWebSocketUri(
         deviceId: widget.device.id,
-        limit: 50,
+        token: widget.token,
       );
-      if (!mounted) return;
-      setState(() {
-        _trafficPoints = data;
-      });
-    } on ApiException catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _trafficError = e.message;
-      });
+      final socket = await WebSocket.connect(
+        uri.toString(),
+        headers: {'Authorization': 'Bearer ${widget.token}'},
+      );
+      _trafficSocket = socket;
+      _trafficSubscription = socket.listen(
+        _handleTrafficPayload,
+        onError: (error) => _handleTrafficError('트래픽 스트림 오류가 발생했습니다. ($error)'),
+        onDone: () => _handleTrafficError('트래픽 스트림이 종료되었습니다. 다시 연결해주세요.'),
+        cancelOnError: true,
+      );
     } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _trafficError = '트래픽 데이터를 불러오지 못했습니다. (${e.toString()})';
-      });
+      _handleTrafficError('트래픽 스트림을 열지 못했습니다. (${e.toString()})');
     } finally {
-      if (mounted) {
-        setState(() {
-          _isLoadingTraffic = false;
-        });
-      }
+      _isConnectingTraffic = false;
     }
+  }
+
+  Future<void> _closeTrafficStream() async {
+    await _trafficSubscription?.cancel();
+    _trafficSubscription = null;
+    await _trafficSocket?.close();
+    _trafficSocket = null;
+  }
+
+  void _handleTrafficPayload(dynamic event) {
+    final message = _parseTrafficMessage(event);
+    if (message == null) {
+      return;
+    }
+    _applyTrafficMessage(message);
+  }
+
+  _TrafficMessage? _parseTrafficMessage(dynamic event) {
+    if (event is! String) return null;
+    try {
+      final decoded = jsonDecode(event);
+      if (decoded is! Map<String, dynamic>) return null;
+
+      final rawPoints = decoded['points'] as List? ?? [];
+      final points = rawPoints
+          .whereType<Map<String, dynamic>>()
+          .map(DeviceTrafficPoint.fromJson)
+          .toList();
+      final type = (decoded['type'] as String?)?.toLowerCase() ?? '';
+      final windowStart = _parseTimestamp(
+        decoded['windowStart'] ?? decoded['window_start'] ?? decoded['startTime'],
+      );
+      return _TrafficMessage(
+        type: type,
+        windowStart: windowStart,
+        points: points,
+      );
+    } catch (_) {
+      return null;
+    }
+  }
+
+  void _applyTrafficMessage(_TrafficMessage message) {
+    if (message.type != 'snapshot' && message.type != 'delta') {
+      return;
+    }
+
+    final combined = message.type == 'snapshot'
+        ? message.points
+        : [..._trafficPoints, ...message.points];
+
+    combined.sort((a, b) => a.timestamp.compareTo(b.timestamp));
+    final cutoff = message.windowStart;
+    final filtered =
+        combined.where((point) => !point.timestamp.isBefore(cutoff)).toList();
+
+    if (!mounted) return;
+    setState(() {
+      _trafficWindowStart = cutoff;
+      _trafficPoints = filtered;
+      _trafficError = null;
+      _isLoadingTraffic = false;
+    });
+  }
+
+  void _handleTrafficError(String message) {
+    _closeTrafficStream();
+    if (!mounted) return;
+    setState(() {
+      _trafficError = message;
+      _isLoadingTraffic = false;
+    });
+  }
+
+  DateTime _parseTimestamp(dynamic raw) {
+    if (raw == null) return DateTime.now();
+    if (raw is int) return DateTime.fromMillisecondsSinceEpoch(raw);
+    if (raw is double) return DateTime.fromMillisecondsSinceEpoch(raw.toInt());
+    if (raw is String) return DateTime.tryParse(raw) ?? DateTime.now();
+    return DateTime.now();
   }
 
   Widget _buildMetaRow(IconData icon, String label, String value) {
@@ -480,6 +586,27 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
               ],
             ),
           ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildLegendDot(Color color, String label) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 10,
+          height: 10,
+          decoration: BoxDecoration(
+            color: color,
+            borderRadius: BorderRadius.circular(6),
+          ),
+        ),
+        const SizedBox(width: 6),
+        Text(
+          label,
+          style: const TextStyle(color: SafeOnColors.textSecondary, fontSize: 12),
         ),
       ],
     );
@@ -630,4 +757,16 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
       ],
     );
   }
+}
+
+class _TrafficMessage {
+  const _TrafficMessage({
+    required this.type,
+    required this.windowStart,
+    required this.points,
+  });
+
+  final String type;
+  final DateTime windowStart;
+  final List<DeviceTrafficPoint> points;
 }
