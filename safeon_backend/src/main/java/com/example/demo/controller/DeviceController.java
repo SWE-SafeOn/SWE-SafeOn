@@ -3,6 +3,7 @@ package com.example.demo.controller;
 import com.example.demo.dto.ApiResponseDto;
 import com.example.demo.dto.SimpleMessageResponseDto;
 import com.example.demo.dto.device.DeviceDiscoveryRequestDto;
+import com.example.demo.dto.device.DeviceBlockRequestDto;
 import com.example.demo.dto.device.DeviceResponseDto;
 import com.example.demo.security.AuthenticatedUser;
 import com.example.demo.service.DeviceService;
@@ -89,5 +90,16 @@ public class DeviceController {
     ) {
         DeviceResponseDto data = deviceService.claimDevice(deviceId, currentUser.userId());
         return ResponseEntity.ok(ApiResponseDto.ok(data));
+    }
+
+    @PostMapping("/block")
+    public ResponseEntity<ApiResponseDto<SimpleMessageResponseDto>> blockDevice(
+            @AuthenticationPrincipal AuthenticatedUser currentUser,
+            @Valid @RequestBody DeviceBlockRequestDto request
+    ) {
+        deviceService.blockDevice(currentUser.userId(), request);
+        return ResponseEntity.ok(ApiResponseDto.ok(
+                SimpleMessageResponseDto.of("기기 차단 요청 전송: " + request.getDeviceId())
+        ));
     }
 }
