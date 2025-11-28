@@ -4,6 +4,7 @@ import com.example.demo.config.MlMqttProperties;
 import com.example.demo.domain.Alert;
 import com.example.demo.domain.AnomalyScore;
 import com.example.demo.domain.Device;
+import com.example.demo.domain.PacketMeta;
 import com.example.demo.domain.UserAlert;
 import com.example.demo.repository.AlertRepository;
 import com.example.demo.repository.AnomalyScoreRepository;
@@ -77,7 +78,8 @@ public class MlResultMqttListener implements MqttPacketListener {
             log.warn("Skip ML result without packetMetaId: {}", payload);
             return;
         }
-        if (!packetMetaRepository.existsById(payload.packetMetaId())) {
+        PacketMeta packetMeta = packetMetaRepository.findById(payload.packetMetaId()).orElse(null);
+        if (packetMeta == null) {
             log.warn("Skip ML result with unknown packetMetaId={}", payload.packetMetaId());
             return;
         }
@@ -98,7 +100,7 @@ public class MlResultMqttListener implements MqttPacketListener {
             return;
         }
 
-        Device device = resolveDevice(payload.deviceId());
+        Device device = resolveDevice(payload.deviceId(), packetMeta);
         Alert alert = Alert.builder()
                 .ts(ts != null ? ts : OffsetDateTime.now())
                 .device(device)
@@ -137,6 +139,34 @@ public class MlResultMqttListener implements MqttPacketListener {
             log.warn("ML result includes unknown deviceId={}", deviceId);
         }
         return device.orElse(null);
+    }
+
+    private Device resolveDevice(UUID deviceId, PacketMeta packetMeta) {
+        Device fromId = resolveDevice(deviceId);
+        if (fromId != null) {
+            return fromId;
+        }
+
+        if (packetMeta == null) {
+            return null;
+        }
+
+        if (StringUtils.hasText(packetMeta.getSrcIp())) {
+            Optional<Device> bySrc = deviceRepository.findFirstByIp(packetMeta.getSrcIp());
+            if (bySrc.isPresent()) {
+                return bySrc.get();
+            }
+        }
+        if (StringUtils.hasText(packetMeta.getDstIp())) {
+            Optional<Device> byDst = deviceRepository.findFirstByIp(packetMeta.getDstIp());
+            if (byDst.isPresent()) {
+                return byDst.get();
+            }
+        }
+
+        log.warn("Cannot resolve device for packetMetaId={} (srcIp={}, dstIp={})",
+                packetMeta.getPacketMetaId(), packetMeta.getSrcIp(), packetMeta.getDstIp());
+        return null;
     }
 
     private OffsetDateTime resolveTime(String isoTime) {

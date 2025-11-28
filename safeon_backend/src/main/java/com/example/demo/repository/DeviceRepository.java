@@ -18,6 +18,8 @@ public interface DeviceRepository extends JpaRepository<Device, UUID> {
 
     Optional<Device> findByMacAddress(String macAddress);
 
+    Optional<Device> findFirstByIp(String ip);
+
     default Device getByDeviceId(UUID deviceId) {
         return findByDeviceId(deviceId)
                 .orElseThrow(() -> new EntityNotFoundException("디바이스를 찾을 수 없습니다 : " + deviceId));
