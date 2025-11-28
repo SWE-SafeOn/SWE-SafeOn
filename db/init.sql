@@ -63,7 +63,8 @@ CREATE TABLE packet_meta (
     bps DOUBLE PRECISION
 );
 
-SELECT create_hypertable('packet_meta', 'start_time', if_not_exists => TRUE);
+-- Primary key가 start_time을 포함하지 않으므로 Timescale 기본 unique 인덱스 생성은 비활성화
+SELECT create_hypertable('packet_meta', 'start_time', create_default_indexes => FALSE, if_not_exists => TRUE);
 
 
 -- ===========================================
