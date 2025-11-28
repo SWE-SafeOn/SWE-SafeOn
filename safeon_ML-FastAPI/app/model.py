@@ -83,6 +83,27 @@ class FlowFeatures(BaseModel):
     start_time: Optional[float] = None
     end_time: Optional[float] = None
 
+    @validator("start_time", "end_time", pre=True)
+    def parse_timestamp(cls, v) -> Optional[float]:  # noqa: D417
+        """Parse ISO-8601 or epoch timestamps into float seconds."""
+        if v is None:
+            return None
+        if isinstance(v, (int, float)):
+            return float(v)
+        if isinstance(v, datetime):
+            ts = v
+        elif isinstance(v, str):
+            try:
+                ts = datetime.fromisoformat(v)
+            except ValueError:
+                return None
+        else:
+            return None
+
+        if ts.tzinfo is None:
+            ts = ts.replace(tzinfo=timezone.utc)
+        return float(ts.timestamp())
+
     @validator("duration", pre=True, always=True)
     def compute_duration(cls, v, values) -> float:  # noqa: D417
         """Back-fill duration if missing using start/end timestamps."""
@@ -332,6 +353,7 @@ class ModelService:
         flow: FlowFeatures,
         user_id: Optional[str] = None,
         timestamp: Optional[datetime] = None,
+        packet_meta_id: Optional[object] = None,
     ) -> Dict[str, object]:
         ts = timestamp or datetime.now(timezone.utc)
         if ts.tzinfo is None:
@@ -356,6 +378,7 @@ class ModelService:
             hybrid_score=hybrid_score,
             is_anom=is_anom,
             user_id=user_id,
+            packet_meta_id=self._coerce_uuid(packet_meta_id),
         )
 
         return {
@@ -518,6 +541,7 @@ class ModelService:
         hybrid_score: float,
         is_anom: bool,
         user_id: Optional[str],
+        packet_meta_id: Optional[UUID],
     ) -> Optional[UUID]:
         if not self.engine:
             return None
@@ -526,7 +550,7 @@ class ModelService:
         payload = {
             "score_id": uuid4(),
             "ts": ts,
-            "packet_meta_id": None,
+            "packet_meta_id": packet_meta_id,
             "alert_id": None,
             "iso_score": iso_score,
             "ae_score": ae_score,
@@ -558,3 +582,15 @@ class ModelService:
             "ae_score": 0.0,
             "hybrid_score": 0.0,
         }
+
+    def _coerce_uuid(self, value: Optional[object]) -> Optional[UUID]:
+        """Safely parse UUID-like values coming from external payloads."""
+        if value is None:
+            return None
+        if isinstance(value, UUID):
+            return value
+        try:
+            return UUID(str(value))
+        except Exception:  # noqa: BLE001
+            LOGGER.warning("Ignoring invalid UUID value: %s", value)
+            return None

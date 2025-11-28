@@ -18,7 +18,7 @@ class MQTTBridge:
     def __init__(
         self,
         model_service: ModelService,
-        host: str = "localhost",
+        host: str = "192.168.0.103",
         port: int = 1883,
         username: Optional[str] = None,
         password: Optional[str] = None,
@@ -134,32 +134,52 @@ class MQTTBridge:
         user_id: Optional[str] = None
         ts_val: Optional[datetime] = None
         request_id: Optional[str] = None
+        packet_meta_id: Optional[str] = None
+        device_id: Optional[str] = None
 
         if isinstance(data, dict):
             flow_data = data.get("flow", data)
-            user_id = data.get("user_id")
-            request_id = data.get("id") or data.get("request_id")
-            ts_val = self._parse_timestamp(data.get("timestamp"))
+            user_id = data.get("user_id") or data.get("userId")
+            request_id = data.get("id") or data.get("request_id") or data.get("requestId")
+            packet_meta_id = data.get("packet_meta_id") or data.get("packetMetaId")
+            device_id = data.get("device_id") or data.get("deviceId")
+            ts_val = self._parse_timestamp(
+                data.get("timestamp") or data.get("ts") or flow_data.get("start_time")
+            )
         else:
             LOGGER.warning("Skipping non-object JSONL line: %s", data)
             return
 
         try:
             flow = FlowFeatures(**flow_data)
-            result = self.model_service.predict(flow, user_id=user_id, timestamp=ts_val)
+            inference_ts = ts_val or datetime.now(timezone.utc)
+            result = self.model_service.predict(
+                flow,
+                user_id=user_id,
+                timestamp=inference_ts,
+                packet_meta_id=packet_meta_id,
+            )
             response = {
-                "id": request_id,
-                "user_id": user_id,
-                "timestamp": ts_val.isoformat() if ts_val else None,
-                "flow": flow_data,
-                "result": result,
+                "packet_meta_id": packet_meta_id,
+                "device_id": device_id,
+                "iso_score": result.get("iso_score"),
+                "ae_score": result.get("ae_score"),
+                "hybrid_score": result.get("hybrid_score"),
+                "is_anom": result.get("is_anom"),
+                "timestamp": inference_ts.isoformat(),
             }
         except Exception as exc:  # noqa: BLE001
             LOGGER.warning("Failed to process MQTT request: %s", exc)
+            fallback_ts = datetime.now(timezone.utc)
             response = {
-                "id": request_id,
+                "packet_meta_id": packet_meta_id,
+                "device_id": device_id,
+                "iso_score": 0.0,
+                "ae_score": 0.0,
+                "hybrid_score": 0.0,
+                "is_anom": False,
+                "timestamp": fallback_ts.isoformat(),
                 "error": str(exc),
-                "flow": flow_data,
             }
 
         self._publish_result(response)
@@ -180,12 +200,13 @@ class MQTTBridge:
         if value is None:
             return None
         if isinstance(value, datetime):
-            return value
+            return value if value.tzinfo else value.replace(tzinfo=timezone.utc)
         if isinstance(value, (int, float)):
             return datetime.fromtimestamp(value, tz=timezone.utc)
         if isinstance(value, str):
             try:
-                return datetime.fromisoformat(value)
+                dt = datetime.fromisoformat(value)
+                return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
             except ValueError:
                 return None
         return None
