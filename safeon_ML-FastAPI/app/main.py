@@ -26,14 +26,10 @@ class PredictionRequest(BaseModel):
 class PredictionResponse(BaseModel):
     """Response schema returned to consuming services."""
 
-    label: str
-    confidence: float
+    is_anom: bool
     iso_score: float
     ae_score: float
     hybrid_score: float
-    persisted: bool
-    anomaly_score_id: Optional[str] = None
-    received_at: datetime
 
 
 class HealthResponse(BaseModel):

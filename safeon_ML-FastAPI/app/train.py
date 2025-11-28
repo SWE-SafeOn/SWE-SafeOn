@@ -13,6 +13,7 @@ from app.model import ModelService
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Train SafeOn models on the provided dataset.")
+    # CLI 인자로 데이터셋과 하이퍼파라미터를 덮어써서 빠르게 실험할 수 있도록 한다.
     parser.add_argument(
         "--dataset",
         type=Path,
@@ -37,6 +38,7 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> None:
     args = parse_args()
+    # ModelService가 전처리/학습/아티팩트 저장을 모두 관리한다.
     service = ModelService.from_env()
     result = service.train(dataset_path=args.dataset, epochs=args.epochs, batch_size=args.batch_size)
     print("Training complete.")

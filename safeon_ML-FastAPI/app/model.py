@@ -167,6 +167,7 @@ class ModelService:
             if torch.backends.mps.is_available()
             else ("cuda" if torch.cuda.is_available() else "cpu")
         )
+        # 가능하면 GPU/MPS를 활용해 학습·추론 속도를 확보한다.
 
         self.paths = ArtifactPaths(
             enc_src_ip=self.model_dir / "enc_src_ip.pkl",
@@ -229,6 +230,7 @@ class ModelService:
         df = df.dropna(subset=self.feature_columns + ["label"]).copy()
         df["proto"] = df["proto"].astype(str).str.upper()
 
+        # 문자열 기반 특성은 라벨 인코더로 숫자형으로 치환한다.
         self.enc_src_ip = LabelEncoder().fit(df["src_ip"])
         self.enc_dst_ip = LabelEncoder().fit(df["dst_ip"])
         self.enc_proto = LabelEncoder().fit(df["proto"])
@@ -258,6 +260,7 @@ class ModelService:
         joblib.dump(self.scaler, self.paths.scaler)
 
         LOGGER.info("Training IsolationForest")
+        # 1차 이상징후 후보를 찾기 위해 IsolationForest를 학습한다.
         self.iso_model = IsolationForest(contamination=0.05, random_state=42)
         self.iso_model.fit(scaled)
         joblib.dump(self.iso_model, self.paths.isolation_forest)
@@ -269,6 +272,7 @@ class ModelService:
         if len(normal_sequences) == 0:
             raise ValueError("No normal sequences available for autoencoder training.")
 
+        # 정상 시퀀스를 Reconstruction 기반 AE 학습용으로만 사용한다.
         dataset = DataLoader(
             TensorDataset(
                 torch.tensor(normal_sequences, dtype=torch.float32),
@@ -330,14 +334,11 @@ class ModelService:
 
         scaled_vec = self._transform_flow(flow)
 
+        # IsolationForest와 AE 점수를 혼합해 최종 이상 점수를 만든다.
         iso_score = float(max(0.0, min(1.0, -self.iso_model.decision_function([scaled_vec])[0])))
         ae_score = float(self._ae_score(scaled_vec))
         hybrid_score = float(0.5 * iso_score + 0.5 * ae_score)
         is_anom = hybrid_score >= self.threshold
-
-        label = "attack" if is_anom else "safe"
-        confidence = float(min(1.0, hybrid_score if is_anom else 1 - hybrid_score))
-
         record_id = self._persist_score(
             ts=ts,
             iso_score=iso_score,
@@ -348,14 +349,10 @@ class ModelService:
         )
 
         return {
-            "label": label,
-            "confidence": confidence,
+            "is_anom": is_anom,
             "iso_score": iso_score,
             "ae_score": ae_score,
             "hybrid_score": hybrid_score,
-            "received_at": ts,
-            "persisted": bool(record_id),
-            "anomaly_score_id": str(record_id) if record_id else None,
         }
 
     # ---------------------------------------------------
@@ -376,6 +373,7 @@ class ModelService:
             self.model_loaded = False
             return
 
+        # 저장된 인코더/스케일러/모델 파라미터를 전부 메모리로 적재한다.
         LOGGER.info("Loading model artifacts from %s", self.model_dir)
         self.enc_src_ip = joblib.load(self.paths.enc_src_ip)
         self.enc_dst_ip = joblib.load(self.paths.enc_dst_ip)
@@ -407,6 +405,7 @@ class ModelService:
         classes = set(encoder.classes_.tolist())
         if value not in classes:
             return -1
+        # 미리 학습된 클래스에만 존재하는 값을 안전하게 숫자로 변환한다.
         return int(encoder.transform([value])[0])
 
     def _transform_flow(self, flow: FlowFeatures) -> np.ndarray:
@@ -435,6 +434,7 @@ class ModelService:
         if len(self.packet_buffer) > self.seq_len:
             self.packet_buffer = self.packet_buffer[-self.seq_len :]
 
+        # 최신 seq_len개 패킷만 유지해 시계열 입력을 구성한다.
         seq = np.array(self.packet_buffer).reshape(1, self.seq_len, self.num_features)
         seq_t = torch.tensor(seq, dtype=torch.float32).to(self.device)
 
@@ -455,13 +455,14 @@ class ModelService:
         if not self.engine:
             return None
 
+        # 추론 결과를 DB anomaly_scores 테이블에 기록한다.
         payload = {
             "score_id": uuid4(),
             "ts": ts,
             "packet_meta_id": None,
             "alert_id": None,
             "iso_score": iso_score,
-            "lstm_score": ae_score,
+            "ae_score": ae_score,
             "hybrid_score": hybrid_score,
             "is_anom": is_anom,
         }
@@ -469,9 +470,9 @@ class ModelService:
         query = text(
             """
             INSERT INTO anomaly_scores (
-                score_id, ts, packet_meta_id, alert_id, iso_score, lstm_score, hybrid_score, is_anom
+                score_id, ts, packet_meta_id, alert_id, iso_score, ae_score, hybrid_score, is_anom
             )
-            VALUES (:score_id, :ts, :packet_meta_id, :alert_id, :iso_score, :lstm_score, :hybrid_score, :is_anom)
+            VALUES (:score_id, :ts, :packet_meta_id, :alert_id, :iso_score, :ae_score, :hybrid_score, :is_anom)
             """
         )
 
@@ -485,12 +486,8 @@ class ModelService:
 
     def _dummy_result(self, ts: datetime) -> Dict[str, object]:
         return {
-            "label": "safe",
-            "confidence": 0.5,
+            "is_anom": False,
             "iso_score": 0.0,
             "ae_score": 0.0,
             "hybrid_score": 0.0,
-            "received_at": ts,
-            "persisted": False,
-            "anomaly_score_id": None,
         }
