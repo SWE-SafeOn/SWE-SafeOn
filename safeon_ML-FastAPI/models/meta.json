@@ -1,5 +1,4 @@
 {
-  "seq_len": 20,
   "feature_columns": [
     "src_ip",
     "dst_ip",
@@ -12,5 +11,6 @@
     "pps",
     "bps"
   ],
-  "threshold": 0.029094022760492194
+  "threshold": 0.31518165641039336,
+  "ae_type": "feedforward"
 }

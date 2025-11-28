@@ -32,6 +32,7 @@ class PredictionResponse(BaseModel):
     iso_score: float
     ae_score: float
     hybrid_score: float
+    rf_score: Optional[float] = None
 
 
 class HealthResponse(BaseModel):
