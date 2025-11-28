@@ -5,9 +5,11 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
 from .model import FlowFeatures, ModelService
+from .mqtt_bridge import MQTTBridge
 
 app = FastAPI(title="SafeOn ML API", version="0.3.0")
 model_service = ModelService.from_env()
+mqtt_bridge = MQTTBridge.from_env(model_service)
 
 
 class PredictionRequest(BaseModel):
@@ -76,3 +78,17 @@ def overridden_swagger() -> dict:
     """Redirect default docs path to FastAPI's Swagger UI."""
 
     return {"message": "Swagger UI available at /docs"}
+
+
+@app.on_event("startup")
+def start_mqtt_bridge() -> None:
+    """Start MQTT bridge to receive packet metadata."""
+
+    mqtt_bridge.start()
+
+
+@app.on_event("shutdown")
+def stop_mqtt_bridge() -> None:
+    """Stop MQTT bridge on application shutdown."""
+
+    mqtt_bridge.stop()
