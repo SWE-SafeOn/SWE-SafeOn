@@ -11,6 +11,8 @@
     "pps",
     "bps"
   ],
-  "threshold": 0.27379303336807137,
-  "ae_type": "feedforward"
+  "threshold": 0.5288513248606597,
+  "ae_type": "feedforward",
+  "iso_decision_min": -0.10528933489243841,
+  "iso_decision_max": 0.2003099025554212
 }

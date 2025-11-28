@@ -202,6 +202,8 @@ class ModelService:
         self.iso_model: Optional[IsolationForest] = None
         self.autoencoder: Optional[FeedForwardAE] = None
         self.gbm_model: Optional[LGBMClassifier] = None
+        self.iso_decision_min: float = 0.0
+        self.iso_decision_max: float = 1.0
         self.engine = create_engine(self.database_url) if self.database_url else None
         self.model_loaded = False
 
@@ -288,6 +290,11 @@ class ModelService:
         self.iso_model = IsolationForest(contamination=0.05, random_state=42)
         self.iso_model.fit(scaled_normal)
         joblib.dump(self.iso_model, self.paths.isolation_forest)
+        iso_decisions_all = self.iso_model.decision_function(scaled_all)
+        self.iso_decision_min = float(np.min(iso_decisions_all))
+        self.iso_decision_max = float(np.max(iso_decisions_all))
+        if self.iso_decision_max - self.iso_decision_min <= 1e-9:
+            self.iso_decision_max = self.iso_decision_min + 1e-6
 
         tensor_normal = torch.tensor(scaled_normal, dtype=torch.float32)
         dataset = DataLoader(
@@ -335,6 +342,8 @@ class ModelService:
             "feature_columns": self.feature_columns,
             "threshold": self.threshold,
             "ae_type": "feedforward",
+            "iso_decision_min": self.iso_decision_min,
+            "iso_decision_max": self.iso_decision_max,
         }
         self.paths.meta.write_text(json.dumps(meta, indent=2))
 
@@ -367,7 +376,7 @@ class ModelService:
         scaled_vec = self._transform_flow(flow)
 
         # IsolationForest와 AE 점수를 혼합해 최종 이상 점수를 만든다.
-        iso_score = float(max(0.0, min(1.0, -self.iso_model.decision_function([scaled_vec])[0])))
+        iso_score = self._iso_score(scaled_vec)
         ae_score = float(self._ae_score(scaled_vec) or 0.0)
         gbm_score = None
         if self.gbm_model is not None:
@@ -426,6 +435,8 @@ class ModelService:
             try:
                 meta = json.loads(self.paths.meta.read_text())
                 self.threshold = float(meta.get("threshold", self.threshold))
+                self.iso_decision_min = float(meta.get("iso_decision_min", self.iso_decision_min))
+                self.iso_decision_max = float(meta.get("iso_decision_max", self.iso_decision_max))
             except Exception as exc:  # noqa: BLE001
                 LOGGER.warning("Failed to parse meta.json: %s", exc)
 
@@ -484,6 +495,17 @@ class ModelService:
         mse = torch.mean((tensor - recon) ** 2).item()
         return float(min(1.0, mse * 10))
 
+    def _iso_score(self, scaled_vec: np.ndarray) -> float:
+        if self.iso_model is None:
+            return 0.0
+        raw = float(self.iso_model.decision_function([scaled_vec])[0])
+        span = self.iso_decision_max - self.iso_decision_min
+        if span <= 1e-9:
+            # Fallback to simple negation if calibration info is missing.
+            return float(max(0.0, min(1.0, -raw)))
+        score = (self.iso_decision_max - raw) / span
+        return float(max(0.0, min(1.0, score)))
+
     def _calculate_threshold(self, scaled: np.ndarray, labels: np.ndarray) -> float:
         if self.iso_model is None:
             return self.threshold
@@ -515,7 +537,7 @@ class ModelService:
     def _compute_hybrid_scores(self, scaled: np.ndarray) -> List[float]:
         scores: List[float] = []
         for vec in scaled:
-            iso_score = float(max(0.0, min(1.0, -self.iso_model.decision_function([vec])[0])))
+            iso_score = self._iso_score(vec)
             ae_score = self._ae_score(vec) or 0.0
             gbm_score = (
                 float(self.gbm_model.predict_proba([vec])[0][1])
