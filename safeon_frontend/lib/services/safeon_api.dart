@@ -35,6 +35,12 @@ class SafeOnApiClient {
   Uri _uri(String path, [Map<String, dynamic>? query]) =>
       Uri.parse('$baseUrl$path').replace(queryParameters: query);
 
+  Uri _wsUri(String path, [Map<String, dynamic>? query]) {
+    final httpUri = _uri(path, query);
+    final scheme = httpUri.scheme == 'https' ? 'wss' : 'ws';
+    return httpUri.replace(scheme: scheme);
+  }
+
   Map<String, String> _jsonHeaders({String? token}) {
     return {
       'Content-Type': 'application/json',
@@ -129,6 +135,13 @@ class SafeOnApiClient {
       _extractError(body) ?? '트래픽 데이터를 불러올 수 없습니다.',
       response.statusCode,
     );
+  }
+
+  Uri deviceTrafficWebSocketUri({
+    required String deviceId,
+    required String token,
+  }) {
+    return _wsUri('/ws/devices/$deviceId/traffic', {'token': token});
   }
 
   Future<UserProfile> fetchProfile(String token) async {
