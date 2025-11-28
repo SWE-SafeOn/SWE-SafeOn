@@ -122,8 +122,16 @@ public class DeviceService {
     @Transactional
     public void blockDevice(UUID userId, DeviceBlockRequestDto request) {
         String deviceId = request.getDeviceId();
-        UserDevice userDevice = getUserDevice(deviceId, userId);
-        Device device = userDevice.getDevice();
+        UUID deviceUuid = UuidParser.parseUUID(deviceId);
+        Device device = deviceRepository.getByDeviceId(deviceUuid);
+
+        boolean isOwnedByUser = userDeviceRepository
+                .findByDeviceDeviceIdAndUserUserId(deviceUuid, userId)
+                .isPresent();
+        boolean isUnclaimed = Boolean.FALSE.equals(device.getDiscovered());
+        if (!isOwnedByUser && !isUnclaimed) {
+            throw new IllegalStateException("해당 기기를 차단할 권한이 없습니다.");
+        }
 
         String blockTopic = mqttProperties.getBlockTopic();
         if (!StringUtils.hasText(blockTopic)) {
