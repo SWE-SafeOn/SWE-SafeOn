@@ -250,22 +250,29 @@ class ModelService:
             }
         )
 
+        normal_mask = df["label"].astype(int) == 0
+        if not normal_mask.any():
+            raise ValueError("No normal samples (label=0) found for training.")
+
         self.scaler = MinMaxScaler()
-        scaled = self.scaler.fit_transform(encoded[self.feature_columns])
-        labels = df["label"].astype(int).to_numpy()
+        normal_encoded = encoded.loc[normal_mask, self.feature_columns]
+        scaled_normal = self.scaler.fit_transform(normal_encoded)
+        labels_normal = df.loc[normal_mask, "label"].astype(int).to_numpy()
+        scaled_all = self.scaler.transform(encoded[self.feature_columns])
+        labels_all = df["label"].astype(int).to_numpy()
 
         joblib.dump(self.enc_src_ip, self.paths.enc_src_ip)
         joblib.dump(self.enc_dst_ip, self.paths.enc_dst_ip)
         joblib.dump(self.enc_proto, self.paths.enc_proto)
         joblib.dump(self.scaler, self.paths.scaler)
 
-        LOGGER.info("Training IsolationForest")
+        LOGGER.info("Training IsolationForest on normal samples only")
         # 1차 이상징후 후보를 찾기 위해 IsolationForest를 학습한다.
         self.iso_model = IsolationForest(contamination=0.05, random_state=42)
-        self.iso_model.fit(scaled)
+        self.iso_model.fit(scaled_normal)
         joblib.dump(self.iso_model, self.paths.isolation_forest)
 
-        sequences, seq_labels = self._create_sequences(scaled, labels, self.seq_len)
+        sequences, seq_labels = self._create_sequences(scaled_normal, labels_normal, self.seq_len)
         if len(sequences) == 0:
             raise ValueError(f"Not enough rows ({len(scaled)}) to build sequences of length {self.seq_len}. Reduce SEQ_LEN or add data.")
         normal_sequences = sequences[seq_labels == 0]
@@ -283,7 +290,7 @@ class ModelService:
         )
 
         LOGGER.info("Training Transformer Autoencoder on %s using %s", self.device, normal_sequences.shape)
-        self.transformer = TransformerAE(num_features=scaled.shape[1], seq_len=self.seq_len).to(self.device)
+        self.transformer = TransformerAE(num_features=scaled_normal.shape[1], seq_len=self.seq_len).to(self.device)
         optimizer = torch.optim.Adam(self.transformer.parameters(), lr=1e-3)
         criterion = nn.MSELoss()
 
@@ -300,10 +307,13 @@ class ModelService:
                 epoch_loss += loss.item()
             LOGGER.info("AE epoch %s/%s - loss=%.6f", epoch, epochs, epoch_loss)
 
+        self.transformer.eval()
         torch.save(self.transformer.state_dict(), self.paths.transformer)
+        self.threshold = self._calculate_threshold(scaled_all, labels_all)
         meta = {
             "seq_len": self.seq_len,
             "feature_columns": self.feature_columns,
+            "threshold": self.threshold,
         }
         self.paths.meta.write_text(json.dumps(meta, indent=2))
 
@@ -385,6 +395,7 @@ class ModelService:
             try:
                 meta = json.loads(self.paths.meta.read_text())
                 self.seq_len = int(meta.get("seq_len", self.seq_len))
+                self.threshold = float(meta.get("threshold", self.threshold))
             except Exception as exc:  # noqa: BLE001
                 LOGGER.warning("Failed to parse meta.json: %s", exc)
 
@@ -442,6 +453,62 @@ class ModelService:
             recon = self.transformer(seq_t)
         mse = torch.mean((seq_t - recon) ** 2).item()
         return float(min(1.0, mse * 10))
+
+    def _calculate_threshold(self, scaled: np.ndarray, labels: np.ndarray) -> float:
+        if self.iso_model is None:
+            return self.threshold
+
+        hybrid_scores = self._compute_hybrid_scores(scaled)
+        normal_scores = [score for score, label in zip(hybrid_scores, labels) if label == 0]
+        attack_scores = [score for score, label in zip(hybrid_scores, labels) if label != 0]
+
+        if not normal_scores or not attack_scores:
+            LOGGER.warning(
+                "Unable to compute threshold (normal=%s, attack=%s). Retaining %.4f",
+                len(normal_scores),
+                len(attack_scores),
+                self.threshold,
+            )
+            return self.threshold
+
+        normal_stat = float(np.max(normal_scores))
+        attack_stat = float(np.min(attack_scores))
+        threshold = float(0.5 * (normal_stat + attack_stat))
+        LOGGER.info(
+            "Computed threshold %.4f (max normal=%.4f, min attack=%.4f)",
+            threshold,
+            normal_stat,
+            attack_stat,
+        )
+        return threshold
+
+    def _compute_hybrid_scores(self, scaled: np.ndarray) -> List[float]:
+        scores: List[float] = []
+        buffer: List[np.ndarray] = []
+        for idx, vec in enumerate(scaled):
+            iso_score = float(max(0.0, min(1.0, -self.iso_model.decision_function([vec])[0])))
+            buffer.append(vec)
+            ae_score = 0.0
+            if self.transformer is not None and self.seq_len > 0:
+                if len(buffer) >= self.seq_len:
+                    if len(buffer) > self.seq_len:
+                        buffer = buffer[-self.seq_len :]
+                    seq = np.array(buffer).reshape(1, self.seq_len, self.num_features)
+                    seq_t = torch.tensor(seq, dtype=torch.float32).to(self.device)
+                    with torch.no_grad():
+                        recon = self.transformer(seq_t)
+                    mse = torch.mean((seq_t - recon) ** 2).item()
+                    ae_score = float(min(1.0, mse * 10))
+                else:
+                    LOGGER.debug(
+                        "Skipping AE score for index %s (insufficient context: %s/%s)",
+                        idx,
+                        len(buffer),
+                        self.seq_len,
+                    )
+                    continue
+            scores.append(float(0.5 * iso_score + 0.5 * ae_score))
+        return scores
 
     def _persist_score(
         self,
