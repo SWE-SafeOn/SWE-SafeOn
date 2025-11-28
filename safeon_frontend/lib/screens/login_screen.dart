@@ -99,6 +99,7 @@ class _LoginScreenState extends State<LoginScreen> {
     }
 
     setState(() => _isLoading = true);
+    final messenger = ScaffoldMessenger.of(context);
 
     try {
       if (_isLoginMode) {
@@ -108,8 +109,9 @@ class _LoginScreenState extends State<LoginScreen> {
         );
 
         final profile = await widget.apiClient.fetchProfile(token);
+        if (!mounted) return;
         _savedNickname = profile.name;
-        ScaffoldMessenger.of(context).showSnackBar(
+        messenger.showSnackBar(
           const SnackBar(content: Text('로그인에 성공했어요!')),
         );
 
@@ -135,8 +137,9 @@ class _LoginScreenState extends State<LoginScreen> {
               : _deriveNicknameFromEmail(_emailController.text),
         );
 
+        if (!mounted) return;
         _savedNickname = nickname;
-        ScaffoldMessenger.of(context).showSnackBar(
+        messenger.showSnackBar(
           const SnackBar(content: Text('회원가입이 완료되었습니다. 로그인해주세요.')),
         );
         setState(() {
@@ -145,14 +148,16 @@ class _LoginScreenState extends State<LoginScreen> {
         });
       }
     } on ApiException catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      if (!mounted) return;
+      messenger.showSnackBar(
         SnackBar(content: Text(e.message)),
       );
     } catch (_) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      if (!mounted) return;
+      messenger.showSnackBar(
         const SnackBar(content: Text('요청 처리 중 오류가 발생했습니다.')),
       );
-      } finally {
+    } finally {
       if (mounted) {
         setState(() => _isLoading = false);
       }

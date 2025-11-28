@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:characters/characters.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -17,59 +16,9 @@ import '../theme/app_theme.dart';
 import '../widgets/alert_tile.dart';
 import '../widgets/device_card.dart';
 import '../widgets/section_header.dart';
-import '../widgets/stat_card.dart';
-import '../widgets/status_chip.dart';
 import '../widgets/security_graph_card.dart';
 import 'profile_edit_screen.dart';
 import 'device_detail_screen.dart';
-
-enum MotionSensitivityLevel { low, medium, high }
-
-extension MotionSensitivityLevelX on MotionSensitivityLevel {
-  String get label {
-    switch (this) {
-      case MotionSensitivityLevel.low:
-        return '낮음';
-      case MotionSensitivityLevel.medium:
-        return '보통';
-      case MotionSensitivityLevel.high:
-        return '높음';
-    }
-  }
-
-  String get description {
-    switch (this) {
-      case MotionSensitivityLevel.low:
-        return '모든 실내 센서가 낮은 민감도로 설정됩니다.';
-      case MotionSensitivityLevel.medium:
-        return '모든 실내 센서가 보통 민감도로 설정됩니다.';
-      case MotionSensitivityLevel.high:
-        return '모든 실내 센서가 높은 민감도로 설정됩니다.';
-    }
-  }
-
-  Color get color {
-    switch (this) {
-      case MotionSensitivityLevel.low:
-        return SafeOnColors.success;
-      case MotionSensitivityLevel.medium:
-        return SafeOnColors.warning;
-      case MotionSensitivityLevel.high:
-        return SafeOnColors.danger;
-    }
-  }
-
-  Color get selectedTextColor {
-    switch (this) {
-      case MotionSensitivityLevel.medium:
-        return SafeOnColors.textPrimary;
-      case MotionSensitivityLevel.low:
-        return SafeOnColors.textPrimary;
-      case MotionSensitivityLevel.high:
-        return SafeOnColors.textPrimary;
-    }
-  }
-}
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({
@@ -103,7 +52,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
   bool _isNightlyAutoArmEnabled = true;
   bool _isHomeModeArmed = true;
   bool _isAutomationActive = true;
-  MotionSensitivityLevel _motionSensitivityLevel = MotionSensitivityLevel.medium;
   bool _isPushnotificationsEnabled = true;
   Timer? _alertPollingTimer;
   static const Duration _alertPollingInterval = Duration(seconds: 30);
@@ -136,7 +84,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   String get _avatarLabel {
     final trimmed = _profile.name.trim();
-    return trimmed.isNotEmpty ? trimmed.characters.first.toUpperCase() : 'S';
+    return trimmed.isNotEmpty ? trimmed.substring(0, 1).toUpperCase() : 'S';
   }
 
   Future<void> _loadDashboard() async {
@@ -416,8 +364,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ? DateFormat('MM/dd HH:mm').format(lastAlertTime.toLocal())
         : 'None';
     final weeklyAnomalyCounts = _weeklyAnomalySeries;
-    final weeklyAnomalyTotal =
-        weeklyAnomalyCounts.fold<int>(0, (sum, count) => sum + count);
 
 
     return SingleChildScrollView(
@@ -441,12 +387,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
               _InsightCard(
                 title: '총 기기 수',
                 value: '$totalDevices',
-                caption: '온라인 ${onlineDevices}대',
+                caption: '온라인 $onlineDevices대',
                 icon: Icons.podcasts,
                 accent: SafeOnColors.primary,
                 onTap: () => setState(() => _selectedIndex = 2),
               ),
-              _InsightCard(
+              const _InsightCard(
                 title: '네트워크 상태',
                 value: '정상',
                 caption: '모든 서비스 정상',
@@ -657,7 +603,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   _isHomeModeArmed = value;
                 });
               },
-              activeColor: SafeOnColors.primary,
+              activeThumbColor: SafeOnColors.primary,
               activeTrackColor: SafeOnColors.primary.withValues(alpha: 0.3),
             ),
           ),
@@ -674,7 +620,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   _isNightlyAutoArmEnabled = value;
                 });
               },
-              activeColor: SafeOnColors.primary,
+              activeThumbColor: SafeOnColors.primary,
               activeTrackColor: SafeOnColors.primary.withValues(alpha: 0.3),
             ),
           ),
@@ -692,7 +638,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   _isAutomationActive = value;
                 });
               },
-              activeColor: SafeOnColors.primary,
+              activeThumbColor: SafeOnColors.primary,
               activeTrackColor: SafeOnColors.primary.withValues(alpha: 0.3),
             ),
           ),
@@ -709,7 +655,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   _isPushnotificationsEnabled = value;
                 });
               },
-              activeColor: SafeOnColors.primary,
+              activeThumbColor: SafeOnColors.primary,
               activeTrackColor: SafeOnColors.primary.withValues(alpha: 0.3),
             ),
           ),
@@ -1076,92 +1022,6 @@ class _InsightCard extends StatelessWidget {
   }
 }
 
-class _MotionSensitivitySelector extends StatelessWidget {
-  const _MotionSensitivitySelector({
-    required this.selectedLevel,
-    required this.onChanged,
-  });
-
-  final MotionSensitivityLevel selectedLevel;
-  final ValueChanged<MotionSensitivityLevel> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final backgroundColor = selectedLevel.color.withValues(alpha: 0.24);
-    final borderColor = selectedLevel.color.withValues(alpha: 0.5);
-    final textStyle = theme.textTheme.labelMedium?.copyWith(
-      fontWeight: FontWeight.w600,
-      color: selectedLevel.selectedTextColor,
-    );
-
-    return PopupMenuButton<MotionSensitivityLevel>(
-      initialValue: selectedLevel,
-      onSelected: onChanged,
-      tooltip: '모션 민감도 변경',
-      itemBuilder: (context) {
-        return MotionSensitivityLevel.values.map((level) {
-          final isCurrent = level == selectedLevel;
-          return PopupMenuItem<MotionSensitivityLevel>(
-            value: level,
-            child: Row(
-              children: [
-                Container(
-                  width: 10,
-                  height: 10,
-                  decoration: BoxDecoration(
-                    color: level.color,
-                    shape: BoxShape.circle,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    level.label,
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      fontWeight:
-                          isCurrent ? FontWeight.w700 : FontWeight.w500,
-                      color: isCurrent
-                          ? SafeOnColors.textPrimary
-                          : SafeOnColors.textSecondary,
-                    ),
-                  ),
-                ),
-                if (isCurrent)
-                  const Icon(
-                    Icons.check,
-                    size: 18,
-                    color: SafeOnColors.textSecondary,
-                  ),
-              ],
-            ),
-          );
-        }).toList();
-      },
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-        decoration: BoxDecoration(
-          color: backgroundColor,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: borderColor),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(selectedLevel.label, style: textStyle),
-            const SizedBox(width: 6),
-            Icon(
-              Icons.keyboard_arrow_down,
-              color: selectedLevel.selectedTextColor,
-              size: 18,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
 class _DiscoveredDeviceSheet extends StatefulWidget {
   const _DiscoveredDeviceSheet({
     required this.apiClient,
@@ -1447,7 +1307,7 @@ class _DiscoveredDeviceTile extends StatelessWidget {
                 CircleAvatar(
                   radius: 24,
                   backgroundColor: SafeOnColors.primary.withValues(alpha: 0.12),
-                  child: Icon(
+                  child: const Icon(
                     Icons.sensors,
                     color: SafeOnColors.primary,
                   ),

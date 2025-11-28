@@ -28,9 +28,6 @@ class DeviceDetailScreen extends StatefulWidget {
 }
 
 class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
-  bool _isStreamingEnabled = true;
-  bool _isTwoWayAudioEnabled = false;
-  bool _isPrivacyShutterEnabled = true;
   bool _isRemoving = false;
   bool _isLoadingTraffic = false;
   String? _trafficError;
@@ -262,12 +259,6 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
     );
   }
 
-  void _showComingSoon(String feature) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('$feature 기능이 곧 제공됩니다.')),
-    );
-  }
-
   void _confirmRemoveDevice() {
     showCupertinoDialog<void>(
       context: context,
@@ -297,9 +288,13 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
   }
 
   Future<void> _removeDevice(BuildContext dialogContext) async {
+    final rootNavigator = Navigator.of(dialogContext, rootNavigator: true);
+    final navigator = Navigator.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+
     if (widget.device.id.isEmpty) {
-      Navigator.of(dialogContext).pop();
-      ScaffoldMessenger.of(context).showSnackBar(
+      rootNavigator.pop();
+      messenger.showSnackBar(
         const SnackBar(content: Text('디바이스 ID를 확인할 수 없어 제거할 수 없습니다.')),
       );
       return;
@@ -313,19 +308,19 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
         token: widget.token,
         deviceId: widget.device.id,
       );
-      if (!mounted) return;
-      Navigator.of(dialogContext, rootNavigator: true).pop(); // close dialog
-      Navigator.of(context).pop(true); // return success to previous screen
+      if (!mounted || !dialogContext.mounted) return;
+      rootNavigator.pop(); // close dialog
+      navigator.pop(true); // return success to previous screen
     } on ApiException catch (e) {
-      if (!mounted) return;
-      Navigator.of(dialogContext, rootNavigator: true).pop();
-      ScaffoldMessenger.of(context).showSnackBar(
+      if (!mounted || !dialogContext.mounted) return;
+      rootNavigator.pop();
+      messenger.showSnackBar(
         SnackBar(content: Text(e.message)),
       );
     } catch (_) {
-      if (!mounted) return;
-      Navigator.of(dialogContext, rootNavigator: true).pop();
-      ScaffoldMessenger.of(context).showSnackBar(
+      if (!mounted || !dialogContext.mounted) return;
+      rootNavigator.pop();
+      messenger.showSnackBar(
         const SnackBar(content: Text('디바이스 제거 중 오류가 발생했습니다. 다시 시도해주세요.')),
       );
     } finally {
@@ -378,109 +373,6 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
     }
   }
 
-  Widget _buildInsightTile({
-    required IconData icon,
-    required String title,
-    required String description,
-    required String actionLabel,
-  }) {
-    return Container(
-      margin: const EdgeInsets.symmetric(vertical: 8),
-      padding: const EdgeInsets.all(20),
-      decoration: _cardDecoration(),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: SafeOnColors.primary.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Icon(icon, color: SafeOnColors.primary),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-              TextButton(
-                onPressed: () => _showComingSoon(actionLabel),
-                child: Text(actionLabel),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Text(
-            description,
-            style: const TextStyle(fontSize: 15, color: SafeOnColors.textSecondary),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildControlTile({
-    required String title,
-    required String subtitle,
-    required IconData icon,
-    required Widget trailing,
-    Color? iconColor,
-  }) {
-    return Container(
-      margin: const EdgeInsets.symmetric(vertical: 8),
-      padding: const EdgeInsets.all(20),
-      decoration: _cardDecoration(),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: (iconColor ?? SafeOnColors.primary).withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: Icon(
-              icon,
-              color: iconColor ?? SafeOnColors.primary,
-            ),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w600,
-                    color: SafeOnColors.textPrimary,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  subtitle,
-                  style: const TextStyle(
-                    fontSize: 15,
-                    color: SafeOnColors.textSecondary,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          trailing,
-        ],
-      ),
-    );
-  }
-
   Widget _buildMetaRow(IconData icon, String label, String value) {
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 6),
@@ -511,23 +403,6 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
       child: Text(
         title,
         style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700),
-      ),
-    );
-  }
-
-  Widget _buildQuickAction(IconData icon, String label, {VoidCallback? onTap}) {
-    return Expanded(
-      child: ElevatedButton.icon(
-        onPressed: onTap,
-        style: ElevatedButton.styleFrom(
-          padding: const EdgeInsets.symmetric(vertical: 14),
-          backgroundColor: SafeOnColors.primary.withValues(alpha: 0.1),
-          foregroundColor: SafeOnColors.primary,
-          elevation: 0,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-        ),
-        icon: Icon(icon),
-        label: Text(label),
       ),
     );
   }
@@ -705,31 +580,6 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
             belowBarData: BarAreaData(
               show: true,
               color: SafeOnColors.accent.withValues(alpha: 0.12),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildBadge(IconData icon, String label, {Color? color}) {
-    final badgeColor = color ?? SafeOnColors.primary;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: badgeColor.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 16, color: badgeColor),
-          const SizedBox(width: 6),
-          Text(
-            label,
-            style: TextStyle(
-              color: badgeColor,
-              fontWeight: FontWeight.w600,
             ),
           ),
         ],

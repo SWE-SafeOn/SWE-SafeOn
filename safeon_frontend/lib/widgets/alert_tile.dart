@@ -85,17 +85,20 @@ class AlertTile extends StatelessWidget {
                         : SafeOnColors.primary,
                   ),
               ],
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Icon(Icons.schedule,
-                    color: SafeOnColors.textSecondary, size: 18),
-                const SizedBox(width: 6),
-                Text(
-                  _formatTimestamp(alert.timestamp),
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: SafeOnColors.textSecondary,
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              const Icon(
+                Icons.schedule,
+                color: SafeOnColors.textSecondary,
+                size: 18,
+              ),
+              const SizedBox(width: 6),
+              Text(
+                _formatTimestamp(alert.timestamp),
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: SafeOnColors.textSecondary,
                   ),
                 ),
                 const SizedBox(width: 10),
