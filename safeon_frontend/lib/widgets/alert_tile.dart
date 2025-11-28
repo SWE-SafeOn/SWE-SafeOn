@@ -82,7 +82,7 @@ class AlertTile extends StatelessWidget {
                     icon: isRead ? Icons.mark_email_read : Icons.mark_email_unread,
                     color: isRead
                         ? SafeOnColors.textSecondary
-                        : SafeOnColors.accent,
+                        : SafeOnColors.primary,
                   ),
               ],
             ),
