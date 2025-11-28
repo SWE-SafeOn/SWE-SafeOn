@@ -59,7 +59,6 @@ public class MqttProperties {
                 .toList();
     }
 
-
     public String getBlockTopic() {
         String blockFromMap = getPublishTopics().get("block");
         if (StringUtils.hasText(blockFromMap)) {
@@ -74,5 +73,37 @@ public class MqttProperties {
             return topicFromMap;
         }
         return mlRequestTopic;
+    }
+
+    public String getDeviceTopic() {
+        if (StringUtils.hasText(deviceTopic)) {
+            return deviceTopic;
+        }
+        return findInSubscribeTopics("device");
+    }
+
+    public String getFlowTopic() {
+        if (StringUtils.hasText(flowTopic)) {
+            return flowTopic;
+        }
+        return findInSubscribeTopics("flow");
+    }
+
+    public String getMlResultTopic() {
+        if (StringUtils.hasText(mlResultTopic)) {
+            return mlResultTopic;
+        }
+        return findInSubscribeTopics("ml");
+    }
+
+    private String findInSubscribeTopics(String keyword) {
+        if (subscribeTopics == null) {
+            return null;
+        }
+        return subscribeTopics.stream()
+                .filter(StringUtils::hasText)
+                .filter(t -> t.contains(keyword))
+                .findFirst()
+                .orElse(null);
     }
 }
