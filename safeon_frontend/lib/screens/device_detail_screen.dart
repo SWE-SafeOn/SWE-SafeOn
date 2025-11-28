@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 import '../models/device.dart';
@@ -210,27 +211,25 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
   }
 
   void _confirmRemoveDevice() {
-    showDialog<void>(
+    showCupertinoDialog<void>(
       context: context,
       builder: (context) {
-        return AlertDialog(
+        return CupertinoAlertDialog(
           title: const Text('디바이스 제거'),
           content: Text('"${widget.device.displayName}" 를 정말 제거하시겠습니까?'),
           actions: [
-            TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('취소')),
-            FilledButton(
-              onPressed: _isRemoving
-                  ? null
-                  : () async {
-                      await _removeDevice(context);
-                    },
-              style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            CupertinoDialogAction(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('취소'),
+            ),
+            CupertinoDialogAction(
+              isDestructiveAction: true,
+              onPressed: () async {
+                if (_isRemoving) return;
+                await _removeDevice(context);
+              },
               child: _isRemoving
-                  ? const SizedBox(
-                      height: 16,
-                      width: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                    )
+                  ? const CupertinoActivityIndicator()
                   : const Text('제거'),
             ),
           ],
