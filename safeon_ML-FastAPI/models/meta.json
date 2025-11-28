@@ -11,5 +11,6 @@
     "duration",
     "pps",
     "bps"
-  ]
+  ],
+  "threshold": 0.029094022760492194
 }
