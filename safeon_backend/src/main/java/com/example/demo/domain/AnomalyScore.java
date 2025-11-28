@@ -31,8 +31,8 @@ public class AnomalyScore {
     @Column(name = "iso_score")
     private Double isoScore;
 
-    @Column(name = "lstm_score")
-    private Double lstmScore;
+    @Column(name = "ae_score")
+    private Double aeScore;
 
     @Column(name = "hybrid_score")
     private Double hybridScore;

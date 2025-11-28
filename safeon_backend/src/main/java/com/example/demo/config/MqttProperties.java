@@ -29,6 +29,8 @@ public class MqttProperties {
 
     private String deviceTopic;
     private String flowTopic;
+    private String mlResultTopic;
+    private String mlRequestTopic;
 
     private Map<String, String> publishTopics;
 
@@ -52,7 +54,7 @@ public class MqttProperties {
         if (subscribeTopics != null && !subscribeTopics.isEmpty()) {
             return subscribeTopics.stream().filter(StringUtils::hasText).toList();
         }
-        return List.of(deviceTopic, flowTopic).stream()
+        return List.of(deviceTopic, flowTopic, mlResultTopic).stream()
                 .filter(StringUtils::hasText)
                 .toList();
     }
@@ -64,5 +66,13 @@ public class MqttProperties {
             return blockFromMap;
         }
         return blockTopic;
+    }
+
+    public String getMlRequestTopic() {
+        String topicFromMap = getPublishTopics().get("ml-request");
+        if (StringUtils.hasText(topicFromMap)) {
+            return topicFromMap;
+        }
+        return mlRequestTopic;
     }
 }
