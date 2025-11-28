@@ -13,7 +13,7 @@ import pandas as pd
 import torch
 import torch.nn as nn
 from pydantic import BaseModel, validator
-from sklearn.ensemble import IsolationForest
+from sklearn.ensemble import IsolationForest, RandomForestClassifier
 from sklearn.preprocessing import LabelEncoder, MinMaxScaler
 from sqlalchemy import create_engine, text
 from torch.utils.data import DataLoader, TensorDataset
@@ -40,31 +40,26 @@ DEFAULT_DB_URL = os.getenv(
 # ---------------------------------------------------
 # Models and schema
 # ---------------------------------------------------
-class TransformerAE(nn.Module):
-    """Transformer-based autoencoder for sequence reconstruction."""
+class FeedForwardAE(nn.Module):
+    """Fully-connected autoencoder for single flow reconstruction."""
 
-    def __init__(self, num_features: int, seq_len: int, emb_dim: int = 64, nhead: int = 4, num_layers: int = 2):
+    def __init__(self, num_features: int, hidden_dim: int = 64, bottleneck: int = 16):
         super().__init__()
-        self.input_layer = nn.Linear(num_features, emb_dim)
-
-        encoder_layer = nn.TransformerEncoderLayer(
-            d_model=emb_dim, nhead=nhead, batch_first=True
+        self.encoder = nn.Sequential(
+            nn.Linear(num_features, hidden_dim),
+            nn.ReLU(),
+            nn.Linear(hidden_dim, bottleneck),
+            nn.ReLU(),
         )
-        self.encoder = nn.TransformerEncoder(encoder_layer, num_layers=num_layers)
-
-        decoder_layer = nn.TransformerDecoderLayer(
-            d_model=emb_dim, nhead=nhead, batch_first=True
+        self.decoder = nn.Sequential(
+            nn.Linear(bottleneck, hidden_dim),
+            nn.ReLU(),
+            nn.Linear(hidden_dim, num_features),
         )
-        self.decoder = nn.TransformerDecoder(decoder_layer, num_layers=num_layers)
-
-        self.output_layer = nn.Linear(emb_dim, num_features)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        x_emb = self.input_layer(x)
-        encoded = self.encoder(x_emb)
-        decoded = self.decoder(x_emb, encoded)
-        out = self.output_layer(decoded)
-        return out
+        encoded = self.encoder(x)
+        return self.decoder(encoded)
 
 
 class FlowFeatures(BaseModel):
@@ -144,6 +139,7 @@ class ArtifactPaths:
     isolation_forest: Path
     transformer: Path
     meta: Path
+    random_forest: Path
 
 
 # ---------------------------------------------------
@@ -171,17 +167,14 @@ class ModelService:
         dataset_path: Path = DEFAULT_DATASET,
         database_url: Optional[str] = DEFAULT_DB_URL,
         allow_dummy: bool = True,
-        seq_len: int = 20,
         threshold: float = 0.35,
     ) -> None:
         self.model_dir = Path(model_dir)
         self.dataset_path = Path(dataset_path)
         self.database_url = database_url
         self.allow_dummy = allow_dummy
-        self.seq_len = seq_len
         self.threshold = threshold
         self.num_features = len(self.feature_columns)
-        self.packet_buffer: List[np.ndarray] = []
 
         self.device = torch.device(
             "mps"
@@ -198,6 +191,7 @@ class ModelService:
             isolation_forest=self.model_dir / "isolation_forest.pkl",
             transformer=self.model_dir / "transformer_ae.pth",
             meta=self.model_dir / "meta.json",
+            random_forest=self.model_dir / "random_forest.pkl",
         )
 
         self.enc_src_ip: Optional[LabelEncoder] = None
@@ -205,7 +199,8 @@ class ModelService:
         self.enc_proto: Optional[LabelEncoder] = None
         self.scaler: Optional[MinMaxScaler] = None
         self.iso_model: Optional[IsolationForest] = None
-        self.transformer: Optional[TransformerAE] = None
+        self.transformer: Optional[FeedForwardAE] = None
+        self.rf_model: Optional[RandomForestClassifier] = None
         self.engine = create_engine(self.database_url) if self.database_url else None
         self.model_loaded = False
 
@@ -218,7 +213,6 @@ class ModelService:
     @classmethod
     def from_env(cls) -> "ModelService":
         allow_dummy = os.getenv("ALLOW_DUMMY", "true").lower() != "false"
-        seq_len = int(os.getenv("SEQ_LEN", "20"))
         threshold = float(os.getenv("ANOMALY_THRESHOLD", "0.35"))
 
         model_dir = Path(os.getenv("MODEL_DIR", DEFAULT_MODEL_DIR))
@@ -230,7 +224,6 @@ class ModelService:
             dataset_path=dataset_path,
             database_url=database_url,
             allow_dummy=allow_dummy,
-            seq_len=seq_len,
             threshold=threshold,
         )
 
@@ -293,32 +286,22 @@ class ModelService:
         self.iso_model.fit(scaled_normal)
         joblib.dump(self.iso_model, self.paths.isolation_forest)
 
-        sequences, seq_labels = self._create_sequences(scaled_normal, labels_normal, self.seq_len)
-        if len(sequences) == 0:
-            raise ValueError(f"Not enough rows ({len(scaled)}) to build sequences of length {self.seq_len}. Reduce SEQ_LEN or add data.")
-        normal_sequences = sequences[seq_labels == 0]
-        if len(normal_sequences) == 0:
-            raise ValueError("No normal sequences available for autoencoder training.")
-
-        # 정상 시퀀스를 Reconstruction 기반 AE 학습용으로만 사용한다.
+        tensor_normal = torch.tensor(scaled_normal, dtype=torch.float32)
         dataset = DataLoader(
-            TensorDataset(
-                torch.tensor(normal_sequences, dtype=torch.float32),
-                torch.tensor(normal_sequences, dtype=torch.float32),
-            ),
+            tensor_normal,
             batch_size=batch_size,
             shuffle=True,
         )
 
-        LOGGER.info("Training Transformer Autoencoder on %s using %s", self.device, normal_sequences.shape)
-        self.transformer = TransformerAE(num_features=scaled_normal.shape[1], seq_len=self.seq_len).to(self.device)
+        LOGGER.info("Training FeedForward Autoencoder on %s using %s samples", self.device, tensor_normal.shape)
+        self.transformer = FeedForwardAE(num_features=scaled_normal.shape[1]).to(self.device)
         optimizer = torch.optim.Adam(self.transformer.parameters(), lr=1e-3)
         criterion = nn.MSELoss()
 
         for epoch in range(1, epochs + 1):
             self.transformer.train()
             epoch_loss = 0.0
-            for batch_x, _ in dataset:
+            for batch_x in dataset:
                 batch_x = batch_x.to(self.device)
                 optimizer.zero_grad()
                 recon = self.transformer(batch_x)
@@ -330,11 +313,22 @@ class ModelService:
 
         self.transformer.eval()
         torch.save(self.transformer.state_dict(), self.paths.transformer)
+
+        LOGGER.info("Training RandomForest classifier on labeled data")
+        self.rf_model = RandomForestClassifier(
+            n_estimators=300,
+            random_state=42,
+            class_weight="balanced_subsample",
+            n_jobs=-1,
+        )
+        self.rf_model.fit(scaled_all, labels_all)
+        joblib.dump(self.rf_model, self.paths.random_forest)
+
         self.threshold = self._calculate_threshold(scaled_all, labels_all)
         meta = {
-            "seq_len": self.seq_len,
             "feature_columns": self.feature_columns,
             "threshold": self.threshold,
+            "ae_type": "feedforward",
         }
         self.paths.meta.write_text(json.dumps(meta, indent=2))
 
@@ -368,8 +362,15 @@ class ModelService:
 
         # IsolationForest와 AE 점수를 혼합해 최종 이상 점수를 만든다.
         iso_score = float(max(0.0, min(1.0, -self.iso_model.decision_function([scaled_vec])[0])))
-        ae_score = float(self._ae_score(scaled_vec))
-        hybrid_score = float(0.5 * iso_score + 0.5 * ae_score)
+        ae_score = float(self._ae_score(scaled_vec) or 0.0)
+        rf_score = None
+        if self.rf_model is not None:
+            try:
+                rf_score = float(self.rf_model.predict_proba([scaled_vec])[0][1])
+            except Exception as exc:  # noqa: BLE001
+                LOGGER.warning("RandomForest prediction failed: %s", exc)
+        rf_contrib = rf_score if rf_score is not None else 0.5
+        hybrid_score = float((iso_score + ae_score + rf_contrib) / 3)
         is_anom = hybrid_score >= self.threshold
         record_id = self._persist_score(
             ts=ts,
@@ -386,6 +387,7 @@ class ModelService:
             "iso_score": iso_score,
             "ae_score": ae_score,
             "hybrid_score": hybrid_score,
+            "rf_score": rf_score,
         }
 
     # ---------------------------------------------------
@@ -417,23 +419,28 @@ class ModelService:
         if self.paths.meta.exists():
             try:
                 meta = json.loads(self.paths.meta.read_text())
-                self.seq_len = int(meta.get("seq_len", self.seq_len))
                 self.threshold = float(meta.get("threshold", self.threshold))
             except Exception as exc:  # noqa: BLE001
                 LOGGER.warning("Failed to parse meta.json: %s", exc)
 
-        self.transformer = TransformerAE(num_features=self.num_features, seq_len=self.seq_len).to(self.device)
-        self.transformer.load_state_dict(torch.load(self.paths.transformer, map_location=self.device))
-        self.transformer.eval()
+        self.transformer = FeedForwardAE(num_features=self.num_features).to(self.device)
+        try:
+            state_dict = torch.load(self.paths.transformer, map_location=self.device)
+            self.transformer.load_state_dict(state_dict)
+            self.transformer.eval()
+        except Exception as exc:  # noqa: BLE001
+            LOGGER.warning("Failed to load feedforward AE weights. Retrain required: %s", exc)
+            self.transformer = None
+        if self.paths.random_forest.exists():
+            try:
+                self.rf_model = joblib.load(self.paths.random_forest)
+            except Exception as exc:  # noqa: BLE001
+                LOGGER.warning("Failed to load RandomForest weights: %s", exc)
+                self.rf_model = None
+        else:
+            self.rf_model = None
 
-        self.model_loaded = True
-
-    def _create_sequences(self, data: np.ndarray, labels: np.ndarray, seq_len: int) -> Tuple[np.ndarray, np.ndarray]:
-        X, y = [], []
-        for i in range(len(data) - seq_len):
-            X.append(data[i : i + seq_len])
-            y.append(labels[i + seq_len])
-        return np.array(X), np.array(y)
+        self.model_loaded = all([self.iso_model, self.transformer, self.rf_model])
 
     def _safe_label_encode(self, encoder: LabelEncoder, value: str) -> int:
         classes = set(encoder.classes_.tolist())
@@ -458,23 +465,15 @@ class ModelService:
         scaled = self.scaler.transform(df[self.feature_columns])
         return scaled[0]
 
-    def _ae_score(self, scaled_vec: np.ndarray) -> float:
+    def _ae_score(self, scaled_vec: np.ndarray) -> Optional[float]:
         if self.transformer is None:
-            return 0.0
+            return None
 
-        self.packet_buffer.append(scaled_vec)
-        if len(self.packet_buffer) < self.seq_len:
-            return 0.0
-        if len(self.packet_buffer) > self.seq_len:
-            self.packet_buffer = self.packet_buffer[-self.seq_len :]
-
-        # 최신 seq_len개 패킷만 유지해 시계열 입력을 구성한다.
-        seq = np.array(self.packet_buffer).reshape(1, self.seq_len, self.num_features)
-        seq_t = torch.tensor(seq, dtype=torch.float32).to(self.device)
+        tensor = torch.tensor(scaled_vec.reshape(1, -1), dtype=torch.float32).to(self.device)
 
         with torch.no_grad():
-            recon = self.transformer(seq_t)
-        mse = torch.mean((seq_t - recon) ** 2).item()
+            recon = self.transformer(tensor)
+        mse = torch.mean((tensor - recon) ** 2).item()
         return float(min(1.0, mse * 10))
 
     def _calculate_threshold(self, scaled: np.ndarray, labels: np.ndarray) -> float:
@@ -507,30 +506,15 @@ class ModelService:
 
     def _compute_hybrid_scores(self, scaled: np.ndarray) -> List[float]:
         scores: List[float] = []
-        buffer: List[np.ndarray] = []
-        for idx, vec in enumerate(scaled):
+        for vec in scaled:
             iso_score = float(max(0.0, min(1.0, -self.iso_model.decision_function([vec])[0])))
-            buffer.append(vec)
-            ae_score = 0.0
-            if self.transformer is not None and self.seq_len > 0:
-                if len(buffer) >= self.seq_len:
-                    if len(buffer) > self.seq_len:
-                        buffer = buffer[-self.seq_len :]
-                    seq = np.array(buffer).reshape(1, self.seq_len, self.num_features)
-                    seq_t = torch.tensor(seq, dtype=torch.float32).to(self.device)
-                    with torch.no_grad():
-                        recon = self.transformer(seq_t)
-                    mse = torch.mean((seq_t - recon) ** 2).item()
-                    ae_score = float(min(1.0, mse * 10))
-                else:
-                    LOGGER.debug(
-                        "Skipping AE score for index %s (insufficient context: %s/%s)",
-                        idx,
-                        len(buffer),
-                        self.seq_len,
-                    )
-                    continue
-            scores.append(float(0.5 * iso_score + 0.5 * ae_score))
+            ae_score = self._ae_score(vec) or 0.0
+            rf_score = (
+                float(self.rf_model.predict_proba([vec])[0][1])
+                if self.rf_model is not None
+                else 0.5
+            )
+            scores.append(float((iso_score + ae_score + rf_score) / 3))
         return scores
 
     def _persist_score(
@@ -581,6 +565,7 @@ class ModelService:
             "iso_score": 0.0,
             "ae_score": 0.0,
             "hybrid_score": 0.0,
+            "rf_score": 0.5,
         }
 
     def _coerce_uuid(self, value: Optional[object]) -> Optional[UUID]:
