@@ -25,7 +25,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--epochs",
         type=int,
-        default=int(os.getenv("EPOCHS", "10")),
+        default=int(os.getenv("EPOCHS", "16")),
         help="Number of epochs for the Transformer autoencoder.",
     )
     parser.add_argument(

@@ -230,7 +230,7 @@ class ModelService:
     # ---------------------------------------------------
     # Training
     # ---------------------------------------------------
-    def train(self, dataset_path: Optional[Path] = None, epochs: int = 10, batch_size: int = 32) -> Dict[str, str]:
+    def train(self, dataset_path: Optional[Path] = None, epochs: int = 16, batch_size: int = 32) -> Dict[str, str]:
         path = Path(dataset_path or self.dataset_path)
         if not path.exists():
             raise FileNotFoundError(f"Dataset not found at {path}")
