@@ -1,6 +1,6 @@
 package com.example.demo.mqtt;
 
-import com.example.demo.config.MqttProperties;
+import com.example.demo.config.MlMqttProperties;
 import com.example.demo.domain.Alert;
 import com.example.demo.domain.AnomalyScore;
 import com.example.demo.domain.Device;
@@ -40,7 +40,7 @@ public class MlResultMqttListener implements MqttPacketListener {
     private static final String DEFAULT_CHANNEL = "IN_APP";
     private static final String DEFAULT_DELIVERY_STATUS = "PENDING";
 
-    private final MqttProperties mqttProperties;
+    private final MlMqttProperties mqttProperties;
     private final ObjectMapper objectMapper;
     private final AnomalyScoreRepository anomalyScoreRepository;
     private final PacketMetaRepository packetMetaRepository;

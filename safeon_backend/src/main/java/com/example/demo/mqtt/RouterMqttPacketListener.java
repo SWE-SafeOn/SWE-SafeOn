@@ -1,6 +1,6 @@
 package com.example.demo.mqtt;
 
-import com.example.demo.config.MqttProperties;
+import com.example.demo.config.RouterMqttProperties;
 import com.example.demo.domain.Device;
 import com.example.demo.domain.PacketMeta;
 import com.example.demo.repository.DeviceRepository;
@@ -27,7 +27,7 @@ import java.util.List;
 @Slf4j
 public class RouterMqttPacketListener implements MqttPacketListener {
 
-    private final MqttProperties mqttProperties;
+    private final RouterMqttProperties mqttProperties;
     private final DeviceRepository deviceRepository;
     private final PacketMetaRepository packetMetaRepository;
     private final MlRequestPublisher mlRequestPublisher;

@@ -1,6 +1,6 @@
 package com.example.demo.mqtt;
 
-import com.example.demo.config.MqttProperties;
+import com.example.demo.config.MlMqttProperties;
 import com.example.demo.domain.PacketMeta;
 import com.example.demo.repository.PacketMetaRepository;
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -21,8 +21,8 @@ import java.util.UUID;
 public class MlRequestPublisher {
 
     private final PacketMetaRepository packetMetaRepository;
-    private final MqttClientService mqttClientService;
-    private final MqttProperties mqttProperties;
+    private final MlMqttClientService mqttClientService;
+    private final MlMqttProperties mqttProperties;
     private final ObjectMapper objectMapper;
 
     @Transactional(readOnly = true)

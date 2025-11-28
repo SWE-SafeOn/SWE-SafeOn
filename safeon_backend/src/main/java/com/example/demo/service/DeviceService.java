@@ -6,8 +6,8 @@ import com.example.demo.domain.UserDevice;
 import com.example.demo.dto.device.DeviceDiscoveryRequestDto;
 import com.example.demo.dto.device.DeviceBlockRequestDto;
 import com.example.demo.dto.device.DeviceResponseDto;
-import com.example.demo.config.MqttProperties;
-import com.example.demo.mqtt.MqttClientService;
+import com.example.demo.config.RouterMqttProperties;
+import com.example.demo.mqtt.RouterMqttClientService;
 import com.example.demo.repository.DeviceRepository;
 import com.example.demo.repository.UserDeviceRepository;
 import com.example.demo.repository.UserRepository;
@@ -32,8 +32,8 @@ public class DeviceService {
     private final DeviceRepository deviceRepository;
     private final UserRepository userRepository;
     private final UserDeviceRepository userDeviceRepository;
-    private final MqttClientService mqttClientService;
-    private final MqttProperties mqttProperties;
+    private final RouterMqttClientService mqttClientService;
+    private final RouterMqttProperties mqttProperties;
     private final ObjectMapper objectMapper;
 
     @Transactional

@@ -1,6 +1,6 @@
 package com.example.demo.mqtt;
 
-import com.example.demo.config.MqttProperties;
+import com.example.demo.config.MlMqttProperties;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import lombok.RequiredArgsConstructor;
@@ -10,21 +10,20 @@ import org.eclipse.paho.client.mqttv3.MqttAsyncClient;
 import org.eclipse.paho.client.mqttv3.MqttConnectOptions;
 import org.eclipse.paho.client.mqttv3.MqttException;
 import org.eclipse.paho.client.mqttv3.MqttMessage;
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 
-import java.util.List;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 @Service
 @RequiredArgsConstructor
 @Slf4j
-public class MqttClientService {
+public class MlMqttClientService {
 
-    private final MqttProperties properties;
-    private final ObjectProvider<MqttPacketListener> packetListeners;
+    private final MlMqttProperties properties;
+    private final MlResultMqttListener mlResultMqttListener;
 
     private final AtomicBoolean connected = new AtomicBoolean(false);
     private MqttAsyncClient client;
@@ -32,8 +31,8 @@ public class MqttClientService {
     @PostConstruct
     public void start() {
         if (!properties.isReady()) {
-            log.info("MQTT 연결되지 않았습니다. brokerUri={}, topics={}, enabled={}",
-                    properties.getBrokerUri(), properties.getTopics(), properties.isEnabled());
+            log.info("ML MQTT not ready. brokerUri={}, topics={}, enabled={}",
+                    properties.getBrokerUri(), properties.getTopics(), properties.isReady());
             return;
         }
         connectAndSubscribe();
@@ -47,40 +46,32 @@ public class MqttClientService {
     private void connectAndSubscribe() {
         List<String> topics = properties.getTopics();
         if (topics.isEmpty()) {
-            log.warn("MQTT 토픽이 일치하지 않습니다.");
+            log.warn("ML MQTT topics empty.");
             return;
         }
 
         try {
             client = new MqttAsyncClient(properties.getBrokerUri(), resolveClientId());
-            client.setCallback(null); // callback 대신 subscribe listener 사용
+            client.setCallback(null);
             client.connect(buildOptions()).waitForCompletion();
             connected.set(true);
 
             String[] topicArray = topics.toArray(new String[0]);
             int[] qosArray = topics.stream().mapToInt(t -> properties.getQos()).toArray();
-            IMqttMessageListener listener = messageListener();
+            IMqttMessageListener listener = (topic, message) -> {
+                try {
+                    mlResultMqttListener.onPacketReceived(topic, message.getPayload());
+                } catch (Exception ex) {
+                    log.warn("ML MQTT listener failed. topic={}", topic, ex);
+                }
+            };
             IMqttMessageListener[] listenersArray = topics.stream().map(t -> listener).toArray(IMqttMessageListener[]::new);
             client.subscribe(topicArray, qosArray, null, null, listenersArray);
 
-            log.info("MQTT 연결됨. broker={}, topics={}", properties.getBrokerUri(), topics);
+            log.info("ML MQTT connected. broker={}, topics={}", properties.getBrokerUri(), topics);
         } catch (MqttException e) {
-            log.error("MQTT connect/subscribe 실패. broker={}, topics={}", properties.getBrokerUri(), topics, e);
+            log.error("ML MQTT connect/subscribe failed. broker={}, topics={}", properties.getBrokerUri(), topics, e);
         }
-    }
-
-    private IMqttMessageListener messageListener() {
-        List<MqttPacketListener> listeners = packetListeners.orderedStream().toList();
-        return (topic, message) -> {
-            byte[] payload = message.getPayload();
-            for (MqttPacketListener listener : listeners) {
-                try {
-                    listener.onPacketReceived(topic, payload);
-                } catch (Exception ex) {
-                    log.warn("MQTT packet listener 실패. listener={}, topic={}", listener.getClass().getSimpleName(), topic, ex);
-                }
-            }
-        };
     }
 
     private MqttConnectOptions buildOptions() {
@@ -97,7 +88,7 @@ public class MqttClientService {
     }
 
     private String resolveClientId() {
-        return properties.getClientId() != null ? properties.getClientId() : "backend-" + UUID.randomUUID();
+        return properties.getClientId() != null ? properties.getClientId() : "backend-ml-" + UUID.randomUUID();
     }
 
     private void disconnectQuietly() {
@@ -106,21 +97,18 @@ public class MqttClientService {
                 client.disconnect().waitForCompletion();
                 client.close();
             } catch (MqttException e) {
-                log.warn("MQTT 연결해제 실패", e);
+                log.warn("ML MQTT disconnect failed", e);
             }
         }
     }
 
-    /**
-     * MQTT publish helper for backend-originated events (e.g., device block).
-     */
     public void publish(String topic, String payload) {
         if (!properties.isReady()) {
-            log.warn("MQTT 설정이 준비되지 않아 publish를 건너뜁니다. topic={}", topic);
+            log.warn("ML MQTT not ready. skip publish. topic={}", topic);
             return;
         }
         if (client == null || !connected.get()) {
-            log.warn("MQTT 클라이언트가 연결되지 않아 publish를 건너뜁니다. topic={}", topic);
+            log.warn("ML MQTT client not connected. skip publish. topic={}", topic);
             return;
         }
 
@@ -128,9 +116,9 @@ public class MqttClientService {
             MqttMessage message = new MqttMessage(payload.getBytes(StandardCharsets.UTF_8));
             message.setQos(properties.getQos());
             client.publish(topic, message);
-            log.info("MQTT publish 성공. topic={}", topic);
+            log.info("ML MQTT publish success. topic={}", topic);
         } catch (MqttException e) {
-            log.error("MQTT publish 실패. topic={}", topic, e);
+            log.error("ML MQTT publish failed. topic={}", topic, e);
         }
     }
 }
