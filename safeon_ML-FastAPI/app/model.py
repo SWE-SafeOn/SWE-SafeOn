@@ -372,7 +372,7 @@ class ModelService:
             except Exception as exc:  # noqa: BLE001
                 LOGGER.warning("RandomForest prediction failed: %s", exc)
         rf_contrib = rf_score if rf_score is not None else 0.5
-        hybrid_score = float((iso_score + ae_score + rf_contrib) / 3)
+        hybrid_score = float(0.4 * iso_score + 0.2 * ae_score + 0.4 * rf_contrib)
         is_anom = hybrid_score >= self.threshold
         record_id = self._persist_score(
             ts=ts,
@@ -518,7 +518,7 @@ class ModelService:
                 if self.rf_model is not None
                 else 0.5
             )
-            scores.append(float((iso_score + ae_score + rf_score) / 3))
+            scores.append(float(0.4 * iso_score + 0.2 * ae_score + 0.4 * rf_score))
         return scores
 
     def _persist_score(
