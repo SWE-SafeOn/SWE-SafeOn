@@ -1,6 +1,11 @@
+import 'dart:math' as math;
+
+import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 
+import '../models/device_traffic_point.dart';
 import '../models/device.dart';
 import '../services/safeon_api.dart';
 import '../theme/app_theme.dart';
@@ -27,6 +32,15 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
   bool _isTwoWayAudioEnabled = false;
   bool _isPrivacyShutterEnabled = true;
   bool _isRemoving = false;
+  bool _isLoadingTraffic = false;
+  String? _trafficError;
+  List<DeviceTrafficPoint> _trafficPoints = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadTraffic();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -52,14 +66,14 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
             ),
             SliverToBoxAdapter(
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 4, 20, 8),
-                child: _buildQuickActionsSection(),
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                child: _buildMetaSection(),
               ),
             ),
             SliverToBoxAdapter(
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-                child: _buildMetaSection(),
+                padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
+                child: _buildTrafficSection(),
               ),
             ),
             SliverToBoxAdapter(
@@ -136,18 +150,6 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
     );
   }
 
-  Widget _buildQuickActionsSection() {
-    return Row(
-      children: [
-        _buildQuickAction(Icons.play_circle_filled_rounded, '라이브 보기', onTap: () => _showComingSoon('라이브 보기')),
-        const SizedBox(width: 12),
-        _buildQuickAction(Icons.history_rounded, '이벤트 로그', onTap: () => _showComingSoon('이벤트 로그')),
-        const SizedBox(width: 12),
-        _buildQuickAction(Icons.cloud_upload_outlined, '스토리지', onTap: () => _showComingSoon('스토리지 관리')),
-      ],
-    );
-  }
-
   Widget _buildMetaSection() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -158,6 +160,75 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
         _buildMetaRow(Icons.language, 'IP 주소', widget.device.ip),
         _buildMetaRow(Icons.qr_code_2, 'MAC 주소', widget.device.macAddress),
         _buildMetaRow(Icons.numbers, '시리얼 번호', widget.device.id.isNotEmpty ? widget.device.id : '할당되지 않음'),
+      ],
+    );
+  }
+
+  Widget _buildTrafficSection() {
+    Widget content;
+    if (_isLoadingTraffic) {
+      content = const Center(
+        child: Padding(
+          padding: EdgeInsets.symmetric(vertical: 32),
+          child: CircularProgressIndicator(),
+        ),
+      );
+    } else if (_trafficError != null) {
+      content = Padding(
+        padding: const EdgeInsets.symmetric(vertical: 20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(_trafficError!, style: const TextStyle(color: SafeOnColors.danger)),
+            const SizedBox(height: 8),
+            TextButton(
+              onPressed: _loadTraffic,
+              child: const Text('다시 불러오기'),
+            ),
+          ],
+        ),
+      );
+    } else if (_trafficPoints.isEmpty) {
+      content = Padding(
+        padding: const EdgeInsets.symmetric(vertical: 20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              '트래픽 데이터가 아직 없습니다.',
+              style: TextStyle(color: SafeOnColors.textSecondary),
+            ),
+            const SizedBox(height: 8),
+            TextButton(
+              onPressed: _loadTraffic,
+              child: const Text('새로고침'),
+            ),
+          ],
+        ),
+      );
+    } else {
+      content = Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SizedBox(height: 6),
+          SizedBox(
+            height: 240,
+            child: _buildLineChart(),
+          ),
+        ],
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildSectionTitle('트래픽 추이'),
+        const SizedBox(height: 8),
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: _cardDecoration(),
+          child: content,
+        ),
       ],
     );
   }
@@ -260,6 +331,49 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
     } finally {
       if (mounted) {
         setState(() => _isRemoving = false);
+      }
+    }
+  }
+
+  Future<void> _loadTraffic() async {
+    if (widget.device.id.isEmpty) {
+      setState(() {
+        _trafficPoints = [];
+        _trafficError = '디바이스 ID가 없어 트래픽을 불러올 수 없습니다.';
+      });
+      return;
+    }
+
+    setState(() {
+      _isLoadingTraffic = true;
+      _trafficError = null;
+    });
+
+    try {
+      final data = await widget.apiClient.fetchDeviceTraffic(
+        token: widget.token,
+        deviceId: widget.device.id,
+        limit: 50,
+      );
+      if (!mounted) return;
+      setState(() {
+        _trafficPoints = data;
+      });
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _trafficError = e.message;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _trafficError = '트래픽 데이터를 불러오지 못했습니다. (${e.toString()})';
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoadingTraffic = false;
+        });
       }
     }
   }
@@ -493,6 +607,108 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildLineChart() {
+    final spotsPps = _trafficPoints
+        .map((point) => FlSpot(
+              point.timestamp.millisecondsSinceEpoch.toDouble(),
+              point.pps,
+            ))
+        .toList();
+    final spotsBps = _trafficPoints
+        .map((point) => FlSpot(
+              point.timestamp.millisecondsSinceEpoch.toDouble(),
+              point.bps,
+            ))
+        .toList();
+
+    final minX = spotsPps.map((e) => e.x).fold<double>(spotsPps.first.x, math.min);
+    final maxX = spotsPps.map((e) => e.x).fold<double>(spotsPps.first.x, math.max);
+    final maxY = [
+      ...spotsPps.map((e) => e.y),
+      ...spotsBps.map((e) => e.y),
+    ].fold<double>(0, math.max);
+
+    String formatTs(double x) {
+      final dt = DateTime.fromMillisecondsSinceEpoch(x.toInt());
+      return DateFormat('HH:mm').format(dt);
+    }
+
+    return LineChart(
+      LineChartData(
+        minX: minX,
+        maxX: maxX,
+        minY: 0,
+        maxY: maxY == 0 ? 1 : maxY * 1.2,
+        gridData: FlGridData(
+          show: true,
+          horizontalInterval:
+              ((maxY == 0 ? 1 : maxY / 4).clamp(0.1, double.infinity)).toDouble(),
+          getDrawingHorizontalLine: (value) => FlLine(
+            color: Colors.grey.shade200,
+            strokeWidth: 1,
+          ),
+          drawVerticalLine: false,
+        ),
+        borderData: FlBorderData(
+          show: true,
+          border: Border.all(color: Colors.grey.shade300),
+        ),
+        titlesData: FlTitlesData(
+          rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+          topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+          leftTitles: AxisTitles(
+            sideTitles: SideTitles(
+              showTitles: true,
+              reservedSize: 42,
+              getTitlesWidget: (value, _) => Text(
+                value.toStringAsFixed(0),
+                style: const TextStyle(fontSize: 11, color: SafeOnColors.textSecondary),
+              ),
+            ),
+          ),
+          bottomTitles: AxisTitles(
+            sideTitles: SideTitles(
+              showTitles: true,
+              interval: ((maxX - minX) / 4).clamp(1, double.infinity),
+              reservedSize: 30,
+              getTitlesWidget: (value, _) => Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Text(
+                  formatTs(value),
+                  style: const TextStyle(fontSize: 11, color: SafeOnColors.textSecondary),
+                ),
+              ),
+            ),
+          ),
+        ),
+        lineBarsData: [
+          LineChartBarData(
+            spots: spotsPps,
+            color: SafeOnColors.primary,
+            barWidth: 3,
+            isCurved: true,
+            dotData: const FlDotData(show: false),
+            belowBarData: BarAreaData(
+              show: true,
+              color: SafeOnColors.primary.withOpacity(0.12),
+            ),
+          ),
+          LineChartBarData(
+            spots: spotsBps,
+            color: SafeOnColors.accent,
+            barWidth: 3,
+            isCurved: true,
+            dotData: const FlDotData(show: false),
+            belowBarData: BarAreaData(
+              show: true,
+              color: SafeOnColors.accent.withOpacity(0.12),
+            ),
+          ),
+        ],
+      ),
     );
   }
 

@@ -8,6 +8,7 @@ import 'package:intl/intl.dart';
 
 import '../models/dashboard_overview.dart';
 import '../models/device.dart';
+import '../models/device_traffic_point.dart';
 import '../models/user_profile.dart';
 import '../models/daily_anomaly_count.dart';
 
@@ -89,6 +90,45 @@ class SafeOnApiClient {
       throw ApiException(_extractError(body) ?? '회원가입 요청이 실패했습니다.',
           response.statusCode);
     }
+  }
+
+  Future<List<DeviceTrafficPoint>> fetchDeviceTraffic({
+    required String token,
+    required String deviceId,
+    int limit = 50,
+  }) async {
+    final response = await _httpClient.get(
+      _uri('/devices/$deviceId/traffic', {'limit': '$limit'}),
+      headers: _jsonHeaders(token: token),
+    );
+
+    final body = _decode(response);
+    if (response.statusCode == 200 && body['data'] != null) {
+      final dynamic data = body['data'];
+      final List<dynamic> rows;
+
+      if (data is List) {
+        rows = data;
+      } else if (data is Map<String, dynamic>) {
+        rows = data['items'] as List? ??
+            data['traffic'] as List? ??
+            data['values'] as List? ??
+            <dynamic>[];
+      } else {
+        rows = <dynamic>[];
+      }
+
+      return rows
+          .whereType<Map<String, dynamic>>()
+          .map(DeviceTrafficPoint.fromJson)
+          .toList()
+        ..sort((a, b) => a.timestamp.compareTo(b.timestamp));
+    }
+
+    throw ApiException(
+      _extractError(body) ?? '트래픽 데이터를 불러올 수 없습니다.',
+      response.statusCode,
+    );
   }
 
   Future<UserProfile> fetchProfile(String token) async {
