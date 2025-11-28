@@ -27,6 +27,7 @@ CREATE TABLE devices (
     name VARCHAR(255),
     ip_address VARCHAR(255),
     discovered BOOLEAN,
+    status VARCHAR(32),
     created_at TIMESTAMPTZ
 );
 
@@ -43,36 +44,14 @@ CREATE TABLE user_devices (
 
 
 -- ===========================================
--- FLOWS (HyperTable)
--- ===========================================
-CREATE TABLE flows (
-    flow_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    flow_key VARCHAR(255),
-    src_ip VARCHAR(255),
-    dst_ip VARCHAR(255),
-    src_port SMALLINT,
-    dst_port SMALLINT,
-    l4_proto VARCHAR(32),
-    start_ts TIMESTAMPTZ NOT NULL,
-    end_ts TIMESTAMPTZ,
-    bytes BIGINT,
-    pkts BIGINT
-);
-
--- Make hypertable
-SELECT create_hypertable('flows', 'start_ts', if_not_exists => TRUE);
-
-
--- ===========================================
 -- PACKET_META (HyperTable)
 -- ===========================================
 CREATE TABLE packet_meta (
     packet_meta_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    flow_id UUID,
     src_ip VARCHAR(255),
     dst_ip VARCHAR(255),
-    src_port SMALLINT,
-    dst_port SMALLINT,
+    src_port INTEGER,
+    dst_port INTEGER,
     proto VARCHAR(32),
     time_bucket VARCHAR(64),
     start_time TIMESTAMPTZ NOT NULL,
@@ -81,8 +60,7 @@ CREATE TABLE packet_meta (
     packet_count INTEGER,
     byte_count BIGINT,
     pps DOUBLE PRECISION,
-    bps DOUBLE PRECISION,
-    label INTEGER
+    bps DOUBLE PRECISION
 );
 
 SELECT create_hypertable('packet_meta', 'start_time', if_not_exists => TRUE);
@@ -111,7 +89,6 @@ SELECT create_hypertable('anomaly_scores', 'ts', if_not_exists => TRUE);
 CREATE TABLE twin_residuals (
     residual_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     ts TIMESTAMPTZ NOT NULL,
-    flow_id UUID,
     twin_ver VARCHAR(255),
     pred DOUBLE PRECISION,
     actual DOUBLE PRECISION,
