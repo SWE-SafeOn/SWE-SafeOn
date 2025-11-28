@@ -337,7 +337,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final countsByDay = <int, int>{};
 
     for (final entry in _dailyAnomalyCounts) {
-      final day = DateTime(entry.date.year, entry.date.month, entry.date.day);
+      final localDate = entry.date.toLocal();
+      final day = DateTime(localDate.year, localDate.month, localDate.day);
       if (day.isBefore(start) || day.isAfter(end)) continue;
       final index = day.difference(start).inDays;
       countsByDay[index] = (countsByDay[index] ?? 0) + entry.count;
@@ -487,7 +488,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
               _InsightCard(
                 title: '누적 알림',
-                value: '$alertCount',
+                value: '${_alerts.length}',
                 caption: '마지막:$lastAlertLabel',
                 icon: Icons.warning_amber,
                 accent: SafeOnColors.accent,
