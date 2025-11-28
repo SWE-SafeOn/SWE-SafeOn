@@ -243,6 +243,8 @@ class ModelService:
 
         df = df.dropna(subset=self.feature_columns + ["label"]).copy()
         df["proto"] = df["proto"].astype(str).str.upper()
+        df["pps"] = np.log1p(df["pps"].astype(float))
+        df["bps"] = np.log1p(df["bps"].astype(float))
 
         # 문자열 기반 특성은 라벨 인코더로 숫자형으로 치환한다.
         self.enc_src_ip = LabelEncoder().fit(df["src_ip"])
@@ -457,6 +459,8 @@ class ModelService:
         df["src_ip"] = df["src_ip"].astype(str)
         df["dst_ip"] = df["dst_ip"].astype(str)
         df["proto"] = df["proto"].astype(str).str.upper()
+        df["pps"] = np.log1p(df["pps"].astype(float))
+        df["bps"] = np.log1p(df["bps"].astype(float))
 
         df["src_ip"] = [self._safe_label_encode(self.enc_src_ip, ip) for ip in df["src_ip"]]
         df["dst_ip"] = [self._safe_label_encode(self.enc_dst_ip, ip) for ip in df["dst_ip"]]
