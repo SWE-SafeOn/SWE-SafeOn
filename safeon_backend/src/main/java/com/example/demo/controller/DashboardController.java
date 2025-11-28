@@ -49,7 +49,7 @@ public class DashboardController {
     @GetMapping("/alerts")
     public ResponseEntity<ApiResponseDto<RecentAlertListResponseDto>> getRecentAlerts(
             @AuthenticationPrincipal AuthenticatedUser currentUser,
-            @RequestParam(required = false) Integer limit
+            @RequestParam(name = "limit", required = false) Integer limit
     ) {
         RecentAlertListResponseDto alerts = dashboardService.getRecentAlerts(currentUser.userId(), limit);
         return ResponseEntity.ok(ApiResponseDto.ok(alerts));
@@ -58,13 +58,13 @@ public class DashboardController {
     // 하루동안의 이상치 탐지 개수
     @GetMapping("/anomalies/daily")
     public ResponseEntity<ApiResponseDto<DailyAnomalyCountResponseDto>> getDailyAnomalyCounts(
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate
+            @RequestParam(name = "startDate", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam(name = "endDate", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate
     ) {
         DailyAnomalyCountResponseDto data = dashboardService.getDailyAnomalyCounts(startDate, endDate);
         return ResponseEntity.ok(ApiResponseDto.ok(data));
     }
-
+                                                                                                                          
     @GetMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter stream(
             @AuthenticationPrincipal AuthenticatedUser currentUser
