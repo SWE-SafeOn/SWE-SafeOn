@@ -28,7 +28,7 @@ class _SafeOnAppState extends State<SafeOnApp> {
   UserSession? _session;
   String _cachedEmail = 'Godten@example.com';
   String _cachedNickname = 'Young';
-  String _cachedPassword = 'Secur3Pass!';
+  String _cachedPassword = '12345678';
 
   void _completeOnboarding() {
     setState(() => _completedOnboarding = true);

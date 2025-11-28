@@ -96,6 +96,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   List<SafeOnAlert> _alerts = const [];
   final Set<String> _knownAlertIds = {};
   bool _hasLoadedInitialAlerts = false;
+  final Set<String> _blockingDeviceIds = {};
   bool _isLoading = true;
   String? _errorMessage;
   bool _isNightlyAutoArmEnabled = true;
@@ -214,6 +215,77 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return fetchedAlerts
         .where((alert) => !_knownAlertIds.contains(alert.id))
         .toList();
+  }
+
+  Future<void> _confirmBlockDevice(SafeOnDevice device) async {
+    if (device.id.isEmpty || device.macAddress.isEmpty || device.macAddress == '—') {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('기기 정보가 부족해 차단할 수 없습니다.')),
+      );
+      return;
+    }
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('디바이스 차단'),
+        content: Text('"${device.displayName}"을(를) 차단하고 목록에서 숨길까요?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('취소'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: SafeOnColors.danger),
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('차단'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      await _blockDevice(device);
+    }
+  }
+
+  Future<void> _blockDevice(SafeOnDevice device) async {
+    if (_blockingDeviceIds.contains(device.id)) return;
+
+    setState(() {
+      _blockingDeviceIds.add(device.id);
+    });
+
+    try {
+      await widget.apiClient.blockDevice(
+        token: widget.session.token,
+        deviceId: device.id,
+        macAddress: device.macAddress,
+        ip: device.ip == '—' ? null : device.ip,
+        name: device.name,
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('${device.displayName} 차단 요청을 보냈어요.')),
+      );
+      await _loadDashboard();
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.message)),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('디바이스 차단 중 오류가 발생했습니다. 다시 시도해주세요.')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _blockingDeviceIds.remove(device.id);
+        });
+      }
+    }
   }
 
   @override
@@ -399,6 +471,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     width: 280,
                     child: DeviceCard(
                       device: device,
+                      onBlock: () => _confirmBlockDevice(device),
+                      isBlocking: _blockingDeviceIds.contains(device.id),
                       onTap: () => _openDeviceDetail(device),
                     ),
                   );
@@ -474,6 +548,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
         padding: const EdgeInsets.only(bottom: 18),
         child: DeviceCard(
           device: _devices[index],
+          onBlock: () => _confirmBlockDevice(_devices[index]),
+          isBlocking: _blockingDeviceIds.contains(_devices[index].id),
           onTap: () => _openDeviceDetail(_devices[index]),
         ),
       ),

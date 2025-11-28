@@ -9,10 +9,14 @@ class DeviceCard extends StatelessWidget {
     super.key,
     required this.device,
     this.onTap,
+    this.onBlock,
+    this.isBlocking = false,
   });
 
   final SafeOnDevice device;
   final VoidCallback? onTap;
+  final VoidCallback? onBlock;
+  final bool isBlocking;
 
   @override
   Widget build(BuildContext context) {
@@ -49,6 +53,29 @@ class DeviceCard extends StatelessWidget {
                     ),
                   ),
                   const Spacer(),
+                  if (onBlock != null) ...[
+                    TextButton.icon(
+                      onPressed: isBlocking ? null : onBlock,
+                      style: TextButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        visualDensity: VisualDensity.compact,
+                        foregroundColor: SafeOnColors.danger,
+                        minimumSize: Size.zero,
+                      ),
+                      icon: isBlocking
+                          ? const SizedBox(
+                              width: 14,
+                              height: 14,
+                              child: CircularProgressIndicator(strokeWidth: 2, color: SafeOnColors.danger),
+                            )
+                          : const Icon(Icons.block, size: 18),
+                      label: const Text(
+                        '지우기',
+                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                  ],
                   StatusChip(
                     label: device.status,
                     icon: Icons.shield_moon,

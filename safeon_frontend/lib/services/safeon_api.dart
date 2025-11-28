@@ -251,6 +251,35 @@ class SafeOnApiClient {
     );
   }
 
+  Future<void> blockDevice({
+    required String token,
+    required String deviceId,
+    required String macAddress,
+    String? ip,
+    String? name,
+  }) async {
+    final response = await _httpClient.post(
+      _uri('/devices/block'),
+      headers: _jsonHeaders(token: token),
+      body: jsonEncode({
+        'deviceId': deviceId,
+        'macAddress': macAddress,
+        if (ip != null && ip.isNotEmpty) 'ip': ip,
+        if (name != null && name.isNotEmpty) 'name': name,
+      }),
+    );
+
+    if (response.statusCode == 200 || response.statusCode == 204) {
+      return;
+    }
+
+    final body = _decode(response);
+    throw ApiException(
+      _extractError(body) ?? '디바이스 차단에 실패했습니다.',
+      response.statusCode,
+    );
+  }
+
   Future<List<SafeOnAlert>> fetchRecentAlerts(String token, {int? limit}) async {
     final response = await _httpClient.get(
       _uri('/dashboard/alerts', limit != null ? {'limit': '$limit'} : null),
