@@ -38,8 +38,17 @@ public class DeviceService {
 
     @Transactional
     public void deleteDevice(String deviceId, UUID userId) {
+        UUID deviceUuid = UuidParser.parseUUID(deviceId);
+        Device device = deviceRepository.getByDeviceId(deviceUuid);
+
+        if (Boolean.FALSE.equals(device.getDiscovered())) {
+            userDeviceRepository.findAllByDeviceDeviceId(device.getDeviceId())
+                    .forEach(userDeviceRepository::delete);
+            deviceRepository.delete(device);
+            return;
+        }
+
         UserDevice userDevice = getUserDevice(deviceId, userId);
-        Device device = userDevice.getDevice();
         userDeviceRepository.findAllByDeviceDeviceId(device.getDeviceId())
                 .forEach(userDeviceRepository::delete);
         deviceRepository.delete(device);

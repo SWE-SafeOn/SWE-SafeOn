@@ -58,18 +58,6 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-                child: _buildInsightsSection(),
-              ),
-            ),
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-                child: _buildControlsSection(),
-              ),
-            ),
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
                 child: _buildMetaSection(),
               ),
             ),
@@ -167,94 +155,6 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
         _buildQuickAction(Icons.history_rounded, '이벤트 로그', onTap: () => _showComingSoon('이벤트 로그')),
         const SizedBox(width: 12),
         _buildQuickAction(Icons.cloud_upload_outlined, '스토리지', onTap: () => _showComingSoon('스토리지 관리')),
-      ],
-    );
-  }
-        
-  Widget _buildInsightsSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _buildSectionTitle('라이브 인사이트'),
-        const SizedBox(height: 8),
-        _buildInsightTile(
-          icon: Icons.timeline,
-          title: '활동 타임라인',
-          description: '최근 24시간 모션 2회 감지 · 이상 징후 없음',
-          actionLabel: '타임라인 열기',
-        ),
-        _buildInsightTile(
-          icon: Icons.cloud_outlined,
-          title: '클라우드 백업',
-          description: '영상이 안전한 SafeOn 클라우드에 동기화 중',
-          actionLabel: '스토리지 관리',
-        ),
-        _buildInsightTile(
-          icon: Icons.sensors_outlined,
-          title: '자동화 루틴',
-          description: '“Night Guard”, “Weekend Away”에 참여 중',
-          actionLabel: '루틴 편집',
-        ),
-      ],
-    );
-  }
-
-  Widget _buildControlsSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _buildSectionTitle('디바이스 컨트롤'),
-        const SizedBox(height: 8),
-        _buildControlTile(
-          title: '스트리밍',
-          subtitle: _isStreamingEnabled ? '라이브 피드가 활성화되어 있어요' : '라이브 피드를 일시 중지했어요',
-          icon: Icons.play_circle_outline,
-          iconColor: SafeOnColors.primary,
-          trailing: Switch(
-            value: _isStreamingEnabled,
-            onChanged: (value) {
-              setState(() => _isStreamingEnabled = value);
-            },
-            activeThumbColor: SafeOnColors.primary,
-          ),
-        ),
-        _buildControlTile(
-          title: '양방향 오디오',
-          subtitle: _isTwoWayAudioEnabled ? '스피커 응답 가능' : '마이크가 꺼져 있어요',
-          icon: Icons.mic_none_outlined,
-          iconColor: SafeOnColors.warning,
-          trailing: Switch(
-            value: _isTwoWayAudioEnabled,
-            onChanged: (value) {
-              setState(() => _isTwoWayAudioEnabled = value);
-            },
-            activeThumbColor: SafeOnColors.primary,
-          ),
-        ),
-        _buildControlTile(
-          title: '프라이버시 셔터',
-          subtitle: _isPrivacyShutterEnabled ? '가족 도착 시 자동 닫힘' : '셔터가 열려 있어요',
-          icon: Icons.shield_outlined,
-          iconColor: SafeOnColors.success,
-          trailing: Switch(
-            value: _isPrivacyShutterEnabled,
-            onChanged: (value) {
-              setState(() => _isPrivacyShutterEnabled = value);
-            },
-            activeThumbColor: SafeOnColors.primary,
-          ),
-        ),
-        _buildControlTile(
-          title: '재부팅 / 진단',
-          subtitle: '장치 재시작 및 상태 점검',
-          icon: Icons.restart_alt,
-          iconColor: SafeOnColors.textSecondary,
-          trailing: OutlinedButton.icon(
-            onPressed: () {},
-            icon: const Icon(Icons.restart_alt),
-            label: const Text('실행'),
-          ),
-        ),
       ],
     );
   }

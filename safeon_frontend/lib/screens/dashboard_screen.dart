@@ -471,8 +471,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     width: 280,
                     child: DeviceCard(
                       device: device,
-                      onBlock: () => _confirmBlockDevice(device),
-                      isBlocking: _blockingDeviceIds.contains(device.id),
                       onTap: () => _openDeviceDetail(device),
                     ),
                   );
@@ -548,8 +546,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
         padding: const EdgeInsets.only(bottom: 18),
         child: DeviceCard(
           device: _devices[index],
-          onBlock: () => _confirmBlockDevice(_devices[index]),
-          isBlocking: _blockingDeviceIds.contains(_devices[index].id),
           onTap: () => _openDeviceDetail(_devices[index]),
         ),
       ),
