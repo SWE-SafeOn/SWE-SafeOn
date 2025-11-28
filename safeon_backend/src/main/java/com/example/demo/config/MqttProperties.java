@@ -7,6 +7,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
 import java.util.List;
+import java.util.Map;
 
 @Getter
 @Setter
@@ -14,35 +15,23 @@ import java.util.List;
 @ConfigurationProperties(prefix = "mqtt")
 public class MqttProperties {
 
-    /**
-     * MQTT 사용 여부 (환경 준비가 끝나기 전까지 false 유지).
-     */
     private boolean enabled = false;
 
-    /**
-     * ex) tcp://localhost:1883 or ssl://broker:8883
-     */
     private String brokerUri;
 
-    /**
-     * null 시 랜덤 UUID 기반 client id 사용.
-     */
     private String clientId;
 
     private String username;
 
     private String password;
 
-    /**
-     * 라우터가 패킷/디바이스를 publish 하는 토픽들.
-     */
     private List<String> subscribeTopics;
 
     private String deviceTopic;
     private String flowTopic;
-    /**
-     * 백엔드가 라우터로 차단 명령을 publish 할 토픽.
-     */
+
+    private Map<String, String> publishTopics;
+
     private String blockTopic;
 
     private int qos = 1;
@@ -55,6 +44,10 @@ public class MqttProperties {
         return enabled && StringUtils.hasText(brokerUri) && !getTopics().isEmpty();
     }
 
+    public Map<String, String> getPublishTopics() {
+        return publishTopics != null ? publishTopics : Map.of();
+    }
+
     public List<String> getTopics() {
         if (subscribeTopics != null && !subscribeTopics.isEmpty()) {
             return subscribeTopics.stream().filter(StringUtils::hasText).toList();
@@ -62,5 +55,14 @@ public class MqttProperties {
         return List.of(deviceTopic, flowTopic).stream()
                 .filter(StringUtils::hasText)
                 .toList();
+    }
+
+
+    public String getBlockTopic() {
+        String blockFromMap = getPublishTopics().get("block");
+        if (StringUtils.hasText(blockFromMap)) {
+            return blockFromMap;
+        }
+        return blockTopic;
     }
 }
