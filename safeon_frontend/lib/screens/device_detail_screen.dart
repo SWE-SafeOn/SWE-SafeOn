@@ -131,18 +131,6 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
               ],
             ),
           ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              _buildSignalChip(widget.device.connectionStrength),
-              const SizedBox(width: 8),
-              _buildBadge(
-                isOnline ? Icons.check_circle_outline : Icons.warning_amber_rounded,
-                isOnline ? '안정 연결' : '연결 확인 필요',
-                color: isOnline ? SafeOnColors.success : SafeOnColors.danger,
-              ),
-            ],
-          ),
         ],
       ),
     );
@@ -166,7 +154,6 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
       children: [
         _buildSectionTitle('디바이스 정보'),
         const SizedBox(height: 8),
-        _buildMetaRow(Icons.wifi, '신호 강도', '${(widget.device.connectionStrength * 100).round()}%'),
         _buildMetaRow(Icons.system_update, '마지막 펌웨어 체크', '오늘 09:12'),
         _buildMetaRow(Icons.language, 'IP 주소', widget.device.ip),
         _buildMetaRow(Icons.qr_code_2, 'MAC 주소', widget.device.macAddress),
@@ -507,19 +494,6 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
         ),
       ],
     );
-  }
-
-  Widget _buildSignalChip(double strength) {
-    final percent = (strength * 100).round();
-    IconData icon;
-    if (percent > 80) {
-      icon = Icons.wifi;
-    } else if (percent > 50) {
-      icon = Icons.wifi_2_bar;
-    } else {
-      icon = Icons.wifi_1_bar;
-    }
-    return _buildBadge(icon, '신호 $percent%');
   }
 
   Widget _buildBadge(IconData icon, String label, {Color? color}) {

@@ -21,6 +21,28 @@ class SafeOnAlert {
   final String? deliveryStatus;
   final bool? read;
 
+  SafeOnAlert copyWith({
+    String? id,
+    String? deviceId,
+    String? reason,
+    AlertSeverity? severity,
+    DateTime? timestamp,
+    String? status,
+    String? deliveryStatus,
+    bool? read,
+  }) {
+    return SafeOnAlert(
+      id: id ?? this.id,
+      deviceId: deviceId ?? this.deviceId,
+      reason: reason ?? this.reason,
+      severity: severity ?? this.severity,
+      timestamp: timestamp ?? this.timestamp,
+      status: status ?? this.status,
+      deliveryStatus: deliveryStatus ?? this.deliveryStatus,
+      read: read ?? this.read,
+    );
+  }
+
   factory SafeOnAlert.fromDashboardJson(Map<String, dynamic> json) {
     return SafeOnAlert(
       id: json['id'] as String? ?? '',

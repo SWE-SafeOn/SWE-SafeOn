@@ -106,6 +106,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
   bool _isAutomationActive = true;
   MotionSensitivityLevel _motionSensitivityLevel = MotionSensitivityLevel.medium;
   bool _isPushnotificationsEnabled = true;
+  Timer? _alertPollingTimer;
+  static const Duration _alertPollingInterval = Duration(seconds: 30);
+  bool _isPollingAlerts = false;
   late DateTime _currentWeekStart;
   
 
@@ -115,6 +118,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     _profile = widget.session.profile;
     _currentWeekStart = _startOfWeek(DateTime.now());
     _loadDashboard();
+    _startAlertPolling();
   }
 
   @override
@@ -123,6 +127,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
     if (oldWidget.session.profile != widget.session.profile) {
       _profile = widget.session.profile;
     }
+  }
+
+  @override
+  void dispose() {
+    _alertPollingTimer?.cancel();
+    super.dispose();
   }
 
   String get _avatarLabel {
@@ -180,6 +190,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           await NotificationService.showAlertNotification(alert);
         }
       }
+      _startAlertPolling();
     } on ApiException catch (e) {
       if (!mounted) return;
       setState(() {
@@ -192,6 +203,45 @@ class _DashboardScreenState extends State<DashboardScreen> {
         _errorMessage = '대시보드 데이터를 불러오지 못했습니다.';
         _isLoading = false;
       });
+    }
+  }
+
+  void _startAlertPolling() {
+    _alertPollingTimer?.cancel();
+    _alertPollingTimer = Timer.periodic(
+      _alertPollingInterval,
+      (_) => _pollForNewAlerts(),
+    );
+  }
+
+  Future<void> _pollForNewAlerts() async {
+    if (!_hasLoadedInitialAlerts || _isPollingAlerts || !mounted) {
+      return;
+    }
+
+    _isPollingAlerts = true;
+    try {
+      final alerts = await widget.apiClient
+          .fetchRecentAlerts(widget.session.token, limit: 10);
+      if (!mounted) return;
+
+      final newAlerts = _computeNewAlerts(alerts);
+      setState(() {
+        _alerts = alerts;
+        _knownAlertIds.addAll(alerts.map((alert) => alert.id));
+      });
+
+      if (_isPushnotificationsEnabled && newAlerts.isNotEmpty) {
+        for (final alert in newAlerts) {
+          await NotificationService.showAlertNotification(alert);
+        }
+      }
+    } on ApiException {
+      // Polling failures are ignored; the next cycle will retry.
+    } catch (_) {
+      // Swallow unexpected polling errors to avoid breaking the UI loop.
+    } finally {
+      _isPollingAlerts = false;
     }
   }
 
@@ -232,6 +282,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return fetchedAlerts
         .where((alert) => !_knownAlertIds.contains(alert.id))
         .toList();
+  }
+
+  void _markAlertAsRead(SafeOnAlert alert) {
+    if (alert.read == true) return;
+    setState(() {
+      _alerts = _alerts
+          .map((item) => item.id == alert.id ? item.copyWith(read: true) : item)
+          .toList();
+    });
   }
 
   DateTime _startOfWeek(DateTime date) {
@@ -481,18 +540,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 icon: Icons.wifi_tethering,
                 accent: SafeOnColors.primaryVariant,
               ),
-              _InsightCard(
-                title: '주간 이상 탐지',
-                value: '$weeklyAnomalyTotal',
-                caption: '이번주 요일별 감지 횟수',
-                icon: Icons.graphic_eq,
-                accent: SafeOnColors.accent,
-              ),
             ],
           ),
           const SizedBox(height: 28),
           SectionHeader(
-            title: '추천 디바이스',
+            title: '등록된 디바이스',
             actionLabel: '전체 보기',
             onActionTap: () => setState(() => _selectedIndex = 2),
           ),
@@ -547,7 +599,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 .map(
                   (alert) => Padding(
                     padding: const EdgeInsets.only(bottom: 10),
-                    child: AlertTile(alert: alert),
+                    child: AlertTile(
+                      alert: alert,
+                      onTap: () => _markAlertAsRead(alert),
+                    ),
                   ),
                 )
                 .toList(),
@@ -572,7 +627,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
       physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
       itemCount: _alerts.length,
-      itemBuilder: (context, index) => AlertTile(alert: _alerts[index]),
+      itemBuilder: (context, index) => AlertTile(
+        alert: _alerts[index],
+        onTap: () => _markAlertAsRead(_alerts[index]),
+      ),
     );
   }
 

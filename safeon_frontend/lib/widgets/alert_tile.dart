@@ -9,69 +9,109 @@ class AlertTile extends StatelessWidget {
   const AlertTile({
     super.key,
     required this.alert,
+    this.onTap,
+    this.isAcknowledging = false,
   });
 
   final SafeOnAlert alert;
+  final VoidCallback? onTap;
+  final bool isAcknowledging;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Container(
-      margin: const EdgeInsets.symmetric(vertical: 8),
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: SafeOnColors.surface,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 15,
-            offset: const Offset(0, 8),
+    final isRead = alert.read ?? false;
+    final titleStyle = theme.textTheme.titleMedium?.copyWith(
+      color: isRead ? SafeOnColors.textSecondary : SafeOnColors.textPrimary,
+      fontWeight: isRead ? FontWeight.w600 : FontWeight.w700,
+    );
+    final subtitleStyle = theme.textTheme.bodyMedium?.copyWith(
+      color: isRead ? SafeOnColors.textSecondary : SafeOnColors.textPrimary,
+    );
+
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(20),
+      child: Container(
+        margin: const EdgeInsets.symmetric(vertical: 8),
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: isRead
+              ? SafeOnColors.surface.withOpacity(0.8)
+              : SafeOnColors.primary.withOpacity(0.08),
+          border: Border.all(
+            color: isRead
+                ? SafeOnColors.textSecondary.withOpacity(0.14)
+                : SafeOnColors.primary.withOpacity(0.3),
           ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(
-                Icons.security,
-                color: alert.severity.color,
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  alert.reason,
-                  style: theme.textTheme.titleMedium,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 15,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  Icons.security,
+                  color: alert.severity.color,
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Icon(Icons.schedule, color: SafeOnColors.textSecondary, size: 18),
-              const SizedBox(width: 6),
-              Text(
-                _formatTimestamp(alert.timestamp),
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: SafeOnColors.textSecondary,
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    alert.reason,
+                    style: titleStyle,
+                  ),
                 ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  alert.subtitle,
-                  style: theme.textTheme.bodyMedium,
-                  overflow: TextOverflow.ellipsis,
+                const SizedBox(width: 10),
+                if (isAcknowledging)
+                  const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                else
+                  StatusChip(
+                    label: isRead ? '읽음' : '새 알림',
+                    icon: isRead ? Icons.mark_email_read : Icons.mark_email_unread,
+                    color: isRead
+                        ? SafeOnColors.textSecondary
+                        : SafeOnColors.accent,
+                  ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Icon(Icons.schedule,
+                    color: SafeOnColors.textSecondary, size: 18),
+                const SizedBox(width: 6),
+                Text(
+                  _formatTimestamp(alert.timestamp),
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: SafeOnColors.textSecondary,
+                  ),
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          AlertSeverityChip(alert: alert),
-        ],
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    alert.subtitle,
+                    style: subtitleStyle,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            AlertSeverityChip(alert: alert),
+          ],
+        ),
       ),
     );
   }
