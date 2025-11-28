@@ -104,7 +104,7 @@ class _SecurityGraphCardState extends State<SecurityGraphCard> {
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.22),
+            color: Colors.black.withValues(alpha: 0.22),
             blurRadius: 30,
             offset: const Offset(0, 16),
           ),
@@ -118,7 +118,7 @@ class _SecurityGraphCardState extends State<SecurityGraphCard> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.06),
+                  color: Colors.white.withValues(alpha: 0.06),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Row(
@@ -131,7 +131,7 @@ class _SecurityGraphCardState extends State<SecurityGraphCard> {
                         shape: BoxShape.circle,
                         boxShadow: [
                           BoxShadow(
-                            color: SafeOnColors.accent.withOpacity(0.5),
+                            color: SafeOnColors.accent.withValues(alpha: 0.5),
                             blurRadius: 8,
                             spreadRadius: 1,
                           ),
@@ -199,7 +199,7 @@ class _SecurityGraphCardState extends State<SecurityGraphCard> {
                           painter: _SecurityLinePainter(
                             points: points.map((point) => point.toDouble()).toList(),
                             strokeColor: SafeOnColors.primary,
-                            fillColor: SafeOnColors.primary.withOpacity(0.24),
+                            fillColor: SafeOnColors.primary.withValues(alpha: 0.24),
                             highlightIndex: _hoveredIndex,
                           ),
                           child: Container(
@@ -284,9 +284,9 @@ class _GraphStat extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.04),
+        color: Colors.white.withValues(alpha: 0.04),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.white.withOpacity(0.08)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -335,16 +335,16 @@ class _GraphTooltip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.96),
+        color: Colors.white.withValues(alpha: 0.96),
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.2),
+            color: Colors.black.withValues(alpha: 0.2),
             blurRadius: 12,
             offset: const Offset(0, 6),
           ),
         ],
-        border: Border.all(color: SafeOnColors.primary.withOpacity(0.25)),
+        border: Border.all(color: SafeOnColors.primary.withValues(alpha: 0.25)),
       ),
       child: Text(
         label,
@@ -387,10 +387,10 @@ class _WeekLegend extends StatelessWidget {
                 duration: const Duration(milliseconds: 160),
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
                 decoration: BoxDecoration(
-                  color: isActive ? Colors.white.withOpacity(0.14) : Colors.transparent,
+                  color: isActive ? Colors.white.withValues(alpha: 0.14) : Colors.transparent,
                   borderRadius: BorderRadius.circular(10),
                   border: Border.all(
-                    color: Colors.white.withOpacity(isActive ? 0.3 : 0.12),
+                    color: Colors.white.withValues(alpha: isActive ? 0.3 : 0.12),
                   ),
                 ),
                 child: Column(
@@ -490,7 +490,7 @@ class _SecurityLinePainter extends CustomPainter {
 
       final glowPaint = Paint()
         ..style = PaintingStyle.fill
-        ..color = strokeColor.withOpacity(0.28);
+        ..color = strokeColor.withValues(alpha: 0.28);
 
       final dotPaint = Paint()
         ..style = PaintingStyle.fill

@@ -347,7 +347,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 customBorder: const CircleBorder(),
                 child: CircleAvatar(
                   radius: 18,
-                  backgroundColor: SafeOnColors.primary.withOpacity(0.2),
+                  backgroundColor: SafeOnColors.primary.withValues(alpha: 0.2),
                   child: Text(
                     _avatarLabel,
                     style: theme.textTheme.titleMedium?.copyWith(
@@ -602,7 +602,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               borderRadius: BorderRadius.circular(24),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.04),
+                  color: Colors.black.withValues(alpha: 0.04),
                   blurRadius: 20,
                   offset: const Offset(0, 10),
                 ),
@@ -612,7 +612,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               children: [
                 CircleAvatar(
                   radius: 34,
-                  backgroundColor: SafeOnColors.primary.withOpacity(0.2),
+                  backgroundColor: SafeOnColors.primary.withValues(alpha: 0.2),
                   child: Text(
                     _avatarLabel,
                     style: theme.textTheme.headlineMedium?.copyWith(
@@ -658,7 +658,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 });
               },
               activeColor: SafeOnColors.primary,
-              activeTrackColor: SafeOnColors.primary.withOpacity(0.3),
+              activeTrackColor: SafeOnColors.primary.withValues(alpha: 0.3),
             ),
           ),
           _buildSettingTile(
@@ -675,7 +675,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 });
               },
               activeColor: SafeOnColors.primary,
-              activeTrackColor: SafeOnColors.primary.withOpacity(0.3),
+              activeTrackColor: SafeOnColors.primary.withValues(alpha: 0.3),
             ),
           ),
           _buildSettingTile(
@@ -693,7 +693,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 });
               },
               activeColor: SafeOnColors.primary,
-              activeTrackColor: SafeOnColors.primary.withOpacity(0.3),
+              activeTrackColor: SafeOnColors.primary.withValues(alpha: 0.3),
             ),
           ),
           _buildSettingTile(
@@ -710,7 +710,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 });
               },
               activeColor: SafeOnColors.primary,
-              activeTrackColor: SafeOnColors.primary.withOpacity(0.3),
+              activeTrackColor: SafeOnColors.primary.withValues(alpha: 0.3),
             ),
           ),
           const SizedBox(height: 32),
@@ -812,7 +812,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: SafeOnColors.primary.withOpacity(0.08),
+              color: SafeOnColors.primary.withValues(alpha: 0.08),
               shape: BoxShape.circle,
             ),
             child: Icon(icon, color: SafeOnColors.primary, size: 22),
@@ -911,7 +911,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 18,
             offset: const Offset(0, 8),
           ),
@@ -922,7 +922,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: SafeOnColors.primary.withOpacity(0.1),
+              color: SafeOnColors.primary.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(16),
             ),
             child: Icon(icon, color: SafeOnColors.primary),
@@ -1026,10 +1026,10 @@ class _InsightCard extends StatelessWidget {
           decoration: BoxDecoration(
             color: SafeOnColors.surface,
             borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: accent.withOpacity(0.18)),
+            border: Border.all(color: accent.withValues(alpha: 0.18)),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.04),
+                color: Colors.black.withValues(alpha: 0.04),
                 blurRadius: 16,
                 offset: const Offset(0, 10),
               ),
@@ -1041,7 +1041,7 @@ class _InsightCard extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: accent.withOpacity(0.12),
+                  color: accent.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Icon(icon, color: accent, size: 22),
@@ -1088,8 +1088,8 @@ class _MotionSensitivitySelector extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final backgroundColor = selectedLevel.color.withOpacity(0.24);
-    final borderColor = selectedLevel.color.withOpacity(0.5);
+    final backgroundColor = selectedLevel.color.withValues(alpha: 0.24);
+    final borderColor = selectedLevel.color.withValues(alpha: 0.5);
     final textStyle = theme.textTheme.labelMedium?.copyWith(
       fontWeight: FontWeight.w600,
       color: selectedLevel.selectedTextColor,
@@ -1309,7 +1309,7 @@ class _DiscoveredDeviceSheetState extends State<_DiscoveredDeviceSheet> {
         borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.08),
+            color: Colors.black.withValues(alpha: 0.08),
             blurRadius: 24,
             offset: const Offset(0, -12),
           ),
@@ -1329,7 +1329,7 @@ class _DiscoveredDeviceSheetState extends State<_DiscoveredDeviceSheet> {
                     width: 48,
                     height: 4,
                     decoration: BoxDecoration(
-                      color: colorScheme.onSurface.withOpacity(0.1),
+                      color: colorScheme.onSurface.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(2),
                     ),
                   ),
@@ -1431,7 +1431,7 @@ class _DiscoveredDeviceTile extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 16,
             offset: const Offset(0, 8),
           ),
@@ -1446,7 +1446,7 @@ class _DiscoveredDeviceTile extends StatelessWidget {
               children: [
                 CircleAvatar(
                   radius: 24,
-                  backgroundColor: SafeOnColors.primary.withOpacity(0.12),
+                  backgroundColor: SafeOnColors.primary.withValues(alpha: 0.12),
                   child: Icon(
                     Icons.sensors,
                     color: SafeOnColors.primary,
@@ -1544,7 +1544,7 @@ class _DiscoveredDeviceEmptyState extends StatelessWidget {
         Container(
           padding: const EdgeInsets.all(18),
           decoration: BoxDecoration(
-            color: SafeOnColors.primary.withOpacity(0.08),
+            color: SafeOnColors.primary.withValues(alpha: 0.08),
             shape: BoxShape.circle,
           ),
           child: const Icon(

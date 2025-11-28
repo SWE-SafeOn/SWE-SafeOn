@@ -30,7 +30,7 @@ class DeviceCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(24),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.05),
+              color: Colors.black.withValues(alpha: 0.05),
               blurRadius: 20,
               offset: const Offset(0, 10),
             ),
@@ -45,7 +45,7 @@ class DeviceCard extends StatelessWidget {
                 children: [
                   CircleAvatar(
                     radius: 28,
-                    backgroundColor: SafeOnColors.primary.withOpacity(0.1),
+                    backgroundColor: SafeOnColors.primary.withValues(alpha: 0.1),
                     child: Icon(
                       _iconFromName(device.icon),
                       size: 32,

@@ -98,7 +98,7 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 18,
             offset: const Offset(0, 10),
           ),
@@ -396,7 +396,7 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: SafeOnColors.primary.withOpacity(0.12),
+                  color: SafeOnColors.primary.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(16),
                 ),
                 child: Icon(icon, color: SafeOnColors.primary),
@@ -443,7 +443,7 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: (iconColor ?? SafeOnColors.primary).withOpacity(0.1),
+              color: (iconColor ?? SafeOnColors.primary).withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(14),
             ),
             child: Icon(
@@ -521,7 +521,7 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
         onPressed: onTap,
         style: ElevatedButton.styleFrom(
           padding: const EdgeInsets.symmetric(vertical: 14),
-          backgroundColor: SafeOnColors.primary.withOpacity(0.1),
+          backgroundColor: SafeOnColors.primary.withValues(alpha: 0.1),
           foregroundColor: SafeOnColors.primary,
           elevation: 0,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
@@ -568,7 +568,7 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
             ),
             boxShadow: [
               BoxShadow(
-                color: gradient.first.withOpacity(0.22),
+                color: gradient.first.withValues(alpha: 0.22),
                 blurRadius: 18,
                 offset: const Offset(0, 10),
               ),
@@ -581,7 +581,7 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
               shape: BoxShape.circle,
               color: Colors.white,
               border: Border.all(
-                color: isOnline ? SafeOnColors.primary.withOpacity(0.15) : SafeOnColors.textSecondary.withOpacity(0.15),
+                color: isOnline ? SafeOnColors.primary.withValues(alpha: 0.15) : SafeOnColors.textSecondary.withValues(alpha: 0.15),
                 width: 2,
               ),
             ),
@@ -693,7 +693,7 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
             dotData: const FlDotData(show: false),
             belowBarData: BarAreaData(
               show: true,
-              color: SafeOnColors.primary.withOpacity(0.12),
+              color: SafeOnColors.primary.withValues(alpha: 0.12),
             ),
           ),
           LineChartBarData(
@@ -704,7 +704,7 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
             dotData: const FlDotData(show: false),
             belowBarData: BarAreaData(
               show: true,
-              color: SafeOnColors.accent.withOpacity(0.12),
+              color: SafeOnColors.accent.withValues(alpha: 0.12),
             ),
           ),
         ],
@@ -717,7 +717,7 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: badgeColor.withOpacity(0.08),
+        color: badgeColor.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
@@ -773,7 +773,7 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
       borderRadius: BorderRadius.circular(20),
       boxShadow: [
         BoxShadow(
-          color: Colors.black.withOpacity(0.04),
+          color: Colors.black.withValues(alpha: 0.04),
           blurRadius: 16,
           offset: const Offset(0, 8),
         ),

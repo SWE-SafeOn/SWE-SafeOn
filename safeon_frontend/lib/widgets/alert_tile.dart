@@ -37,17 +37,17 @@ class AlertTile extends StatelessWidget {
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
           color: isRead
-              ? SafeOnColors.surface.withOpacity(0.8)
-              : SafeOnColors.primary.withOpacity(0.08),
+              ? SafeOnColors.surface.withValues(alpha: 0.8)
+              : SafeOnColors.primary.withValues(alpha: 0.08),
           border: Border.all(
             color: isRead
-                ? SafeOnColors.textSecondary.withOpacity(0.14)
-                : SafeOnColors.primary.withOpacity(0.3),
+                ? SafeOnColors.textSecondary.withValues(alpha: 0.14)
+                : SafeOnColors.primary.withValues(alpha: 0.3),
           ),
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.05),
+              color: Colors.black.withValues(alpha: 0.05),
               blurRadius: 15,
               offset: const Offset(0, 8),
             ),
