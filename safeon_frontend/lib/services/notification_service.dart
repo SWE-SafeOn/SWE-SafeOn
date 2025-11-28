@@ -25,9 +25,9 @@ class NotificationService {
     const initializationSettings = InitializationSettings(
       android: AndroidInitializationSettings('@mipmap/ic_launcher'),
       iOS: DarwinInitializationSettings(
-        requestAlertPermission: true,
-        requestBadgePermission: true,
-        requestSoundPermission: true,
+        requestAlertPermission: false,
+        requestBadgePermission: false,
+        requestSoundPermission: false,
       ),
     );
 
@@ -38,8 +38,56 @@ class NotificationService {
           .resolvePlatformSpecificImplementation<
               AndroidFlutterLocalNotificationsPlugin>();
       await androidPlugin?.createNotificationChannel(_alertChannel);
-      await androidPlugin?.requestNotificationsPermission();
     }
+
+    await requestPermission();
+  }
+
+  /// Requests notification permission from the platform.
+  /// Returns true when permission is granted.
+  static Future<bool> requestPermission() async {
+    if (kIsWeb) return false;
+
+    if (defaultTargetPlatform == TargetPlatform.android) {
+      final androidPlugin = _plugin
+          .resolvePlatformSpecificImplementation<
+              AndroidFlutterLocalNotificationsPlugin>();
+      final granted = await androidPlugin?.requestNotificationsPermission();
+      return granted ?? true;
+    }
+
+    final iosPlugin = _plugin
+        .resolvePlatformSpecificImplementation<
+            IOSFlutterLocalNotificationsPlugin>();
+    if (iosPlugin != null) {
+      final granted = await iosPlugin.requestPermissions(
+        alert: true,
+        badge: true,
+        sound: true,
+      );
+      return granted ?? false;
+    }
+
+    final macOsPlugin = _plugin
+        .resolvePlatformSpecificImplementation<
+            MacOSFlutterLocalNotificationsPlugin>();
+    if (macOsPlugin != null) {
+      final granted = await macOsPlugin.requestPermissions(
+        alert: true,
+        badge: true,
+        sound: true,
+      );
+      return granted ?? false;
+    }
+
+    return false;
+  }
+
+  /// Cancels any delivered notifications so the user no longer sees them
+  /// when push is turned off.
+  static Future<void> disableNotifications() async {
+    if (kIsWeb) return;
+    await _plugin.cancelAll();
   }
 
   static Future<void> showAlertNotification(SafeOnAlert alert) async {

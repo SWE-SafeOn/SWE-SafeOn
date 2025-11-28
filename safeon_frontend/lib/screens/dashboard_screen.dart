@@ -53,6 +53,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   bool _isHomeModeArmed = true;
   bool _isAutomationActive = true;
   bool _isPushnotificationsEnabled = true;
+  bool _isUpdatingPushNotifications = false;
   Timer? _alertPollingTimer;
   static const Duration _alertPollingInterval = Duration(seconds: 30);
   bool _isPollingAlerts = false;
@@ -238,6 +239,50 @@ class _DashboardScreenState extends State<DashboardScreen> {
           .map((item) => item.id == alert.id ? item.copyWith(read: true) : item)
           .toList();
     });
+  }
+
+  Future<void> _handlePushNotificationToggle(bool enable) async {
+    if (_isUpdatingPushNotifications) return;
+
+    setState(() {
+      _isUpdatingPushNotifications = true;
+    });
+
+    try {
+      if (enable) {
+        final granted = await NotificationService.requestPermission();
+        if (!mounted) return;
+
+        if (granted) {
+          setState(() => _isPushnotificationsEnabled = true);
+        } else {
+          setState(() => _isPushnotificationsEnabled = false);
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('푸시 알림 권한이 거부되어 알림을 받을 수 없어요. 설정에서 허용해주세요.'),
+            ),
+          );
+        }
+      } else {
+        await NotificationService.disableNotifications();
+        if (!mounted) return;
+        setState(() => _isPushnotificationsEnabled = false);
+      }
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _isPushnotificationsEnabled = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('푸시 알림 설정을 변경하지 못했어요. 다시 시도해주세요.'),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isUpdatingPushNotifications = false;
+        });
+      }
+    }
   }
 
   DateTime _startOfWeek(DateTime date) {
@@ -650,11 +695,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 : '알림 및 시스템 알림 꺼짐',
             trailing: Switch(
               value: _isPushnotificationsEnabled,
-              onChanged: (value) {
-                setState((){
-                  _isPushnotificationsEnabled = value;
-                });
-              },
+              onChanged:
+                  _isUpdatingPushNotifications ? null : _handlePushNotificationToggle,
               activeThumbColor: SafeOnColors.primary,
               activeTrackColor: SafeOnColors.primary.withValues(alpha: 0.3),
             ),
