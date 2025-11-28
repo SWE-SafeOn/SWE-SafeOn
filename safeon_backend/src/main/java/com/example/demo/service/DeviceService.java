@@ -41,7 +41,7 @@ public class DeviceService {
         UUID deviceUuid = UuidParser.parseUUID(deviceId);
         Device device = deviceRepository.getByDeviceId(deviceUuid);
 
-        if (Boolean.FALSE.equals(device.getDiscovered())) {
+        if (!Boolean.TRUE.equals(device.getDiscovered())) {
             userDeviceRepository.findAllByDeviceDeviceId(device.getDeviceId())
                     .forEach(userDeviceRepository::delete);
             deviceRepository.delete(device);
