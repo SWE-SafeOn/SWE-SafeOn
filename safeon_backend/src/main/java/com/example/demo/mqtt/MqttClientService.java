@@ -9,10 +9,12 @@ import org.eclipse.paho.client.mqttv3.IMqttMessageListener;
 import org.eclipse.paho.client.mqttv3.MqttAsyncClient;
 import org.eclipse.paho.client.mqttv3.MqttConnectOptions;
 import org.eclipse.paho.client.mqttv3.MqttException;
+import org.eclipse.paho.client.mqttv3.MqttMessage;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.nio.charset.StandardCharsets;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -106,6 +108,29 @@ public class MqttClientService {
             } catch (MqttException e) {
                 log.warn("MQTT 연결해제 실패", e);
             }
+        }
+    }
+
+    /**
+     * MQTT publish helper for backend-originated events (e.g., device block).
+     */
+    public void publish(String topic, String payload) {
+        if (!properties.isReady()) {
+            log.warn("MQTT 설정이 준비되지 않아 publish를 건너뜁니다. topic={}", topic);
+            return;
+        }
+        if (client == null || !connected.get()) {
+            log.warn("MQTT 클라이언트가 연결되지 않아 publish를 건너뜁니다. topic={}", topic);
+            return;
+        }
+
+        try {
+            MqttMessage message = new MqttMessage(payload.getBytes(StandardCharsets.UTF_8));
+            message.setQos(properties.getQos());
+            client.publish(topic, message);
+            log.info("MQTT publish 성공. topic={}", topic);
+        } catch (MqttException e) {
+            log.error("MQTT publish 실패. topic={}", topic, e);
         }
     }
 }

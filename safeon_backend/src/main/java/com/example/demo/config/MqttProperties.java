@@ -40,6 +40,10 @@ public class MqttProperties {
 
     private String deviceTopic;
     private String flowTopic;
+    /**
+     * 백엔드가 라우터로 차단 명령을 publish 할 토픽.
+     */
+    private String blockTopic;
 
     private int qos = 1;
 
