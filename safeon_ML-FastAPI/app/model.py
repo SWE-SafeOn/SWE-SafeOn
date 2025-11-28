@@ -13,7 +13,8 @@ import pandas as pd
 import torch
 import torch.nn as nn
 from pydantic import BaseModel, validator
-from sklearn.ensemble import IsolationForest, RandomForestClassifier
+from sklearn.ensemble import IsolationForest
+from lightgbm import LGBMClassifier
 from sklearn.preprocessing import LabelEncoder, MinMaxScaler
 from sqlalchemy import create_engine, text
 from torch.utils.data import DataLoader, TensorDataset
@@ -137,9 +138,9 @@ class ArtifactPaths:
     enc_proto: Path
     scaler: Path
     isolation_forest: Path
-    transformer: Path
+    autoencoder: Path
     meta: Path
-    random_forest: Path
+    lgbm: Path
 
 
 # ---------------------------------------------------
@@ -189,9 +190,9 @@ class ModelService:
             enc_proto=self.model_dir / "enc_proto.pkl",
             scaler=self.model_dir / "scaler.pkl",
             isolation_forest=self.model_dir / "isolation_forest.pkl",
-            transformer=self.model_dir / "transformer_ae.pth",
+            autoencoder=self.model_dir / "autoencoder.pth",
             meta=self.model_dir / "meta.json",
-            random_forest=self.model_dir / "random_forest.pkl",
+            lgbm=self.model_dir / "lgbm.pkl",
         )
 
         self.enc_src_ip: Optional[LabelEncoder] = None
@@ -199,8 +200,8 @@ class ModelService:
         self.enc_proto: Optional[LabelEncoder] = None
         self.scaler: Optional[MinMaxScaler] = None
         self.iso_model: Optional[IsolationForest] = None
-        self.transformer: Optional[FeedForwardAE] = None
-        self.rf_model: Optional[RandomForestClassifier] = None
+        self.autoencoder: Optional[FeedForwardAE] = None
+        self.gbm_model: Optional[LGBMClassifier] = None
         self.engine = create_engine(self.database_url) if self.database_url else None
         self.model_loaded = False
 
@@ -296,35 +297,38 @@ class ModelService:
         )
 
         LOGGER.info("Training FeedForward Autoencoder on %s using %s samples", self.device, tensor_normal.shape)
-        self.transformer = FeedForwardAE(num_features=scaled_normal.shape[1]).to(self.device)
-        optimizer = torch.optim.Adam(self.transformer.parameters(), lr=1e-3)
+        self.autoencoder = FeedForwardAE(num_features=scaled_normal.shape[1]).to(self.device)
+        optimizer = torch.optim.Adam(self.autoencoder.parameters(), lr=1e-3)
         criterion = nn.MSELoss()
 
         for epoch in range(1, epochs + 1):
-            self.transformer.train()
+            self.autoencoder.train()
             epoch_loss = 0.0
             for batch_x in dataset:
                 batch_x = batch_x.to(self.device)
                 optimizer.zero_grad()
-                recon = self.transformer(batch_x)
+                recon = self.autoencoder(batch_x)
                 loss = criterion(recon, batch_x)
                 loss.backward()
                 optimizer.step()
                 epoch_loss += loss.item()
             LOGGER.info("AE epoch %s/%s - loss=%.6f", epoch, epochs, epoch_loss)
 
-        self.transformer.eval()
-        torch.save(self.transformer.state_dict(), self.paths.transformer)
+        self.autoencoder.eval()
+        torch.save(self.autoencoder.state_dict(), self.paths.autoencoder)
 
-        LOGGER.info("Training RandomForest classifier on labeled data")
-        self.rf_model = RandomForestClassifier(
-            n_estimators=300,
+        LOGGER.info("Training LightGBM classifier on labeled data")
+        self.gbm_model = LGBMClassifier(
+            n_estimators=500,
+            learning_rate=0.05,
+            max_depth=-1,
+            subsample=0.8,
+            colsample_bytree=0.8,
             random_state=42,
-            class_weight="balanced_subsample",
-            n_jobs=-1,
+            class_weight="balanced",
         )
-        self.rf_model.fit(scaled_all, labels_all)
-        joblib.dump(self.rf_model, self.paths.random_forest)
+        self.gbm_model.fit(scaled_all, labels_all)
+        joblib.dump(self.gbm_model, self.paths.lgbm)
 
         self.threshold = self._calculate_threshold(scaled_all, labels_all)
         meta = {
@@ -365,14 +369,14 @@ class ModelService:
         # IsolationForest와 AE 점수를 혼합해 최종 이상 점수를 만든다.
         iso_score = float(max(0.0, min(1.0, -self.iso_model.decision_function([scaled_vec])[0])))
         ae_score = float(self._ae_score(scaled_vec) or 0.0)
-        rf_score = None
-        if self.rf_model is not None:
+        gbm_score = None
+        if self.gbm_model is not None:
             try:
-                rf_score = float(self.rf_model.predict_proba([scaled_vec])[0][1])
+                gbm_score = float(self.gbm_model.predict_proba([scaled_vec])[0][1])
             except Exception as exc:  # noqa: BLE001
-                LOGGER.warning("RandomForest prediction failed: %s", exc)
-        rf_contrib = rf_score if rf_score is not None else 0.5
-        hybrid_score = float(0.4 * iso_score + 0.2 * ae_score + 0.4 * rf_contrib)
+                LOGGER.warning("LightGBM prediction failed: %s", exc)
+        gbm_contrib = gbm_score if gbm_score is not None else 0.5
+        hybrid_score = float(0.4 * iso_score + 0.2 * ae_score + 0.4 * gbm_contrib)
         is_anom = hybrid_score >= self.threshold
         record_id = self._persist_score(
             ts=ts,
@@ -389,7 +393,7 @@ class ModelService:
             "iso_score": iso_score,
             "ae_score": ae_score,
             "hybrid_score": hybrid_score,
-            "rf_score": rf_score,
+            "gbm_score": gbm_score,
         }
 
     # ---------------------------------------------------
@@ -402,7 +406,7 @@ class ModelService:
             self.paths.enc_proto,
             self.paths.scaler,
             self.paths.isolation_forest,
-            self.paths.transformer,
+            self.paths.autoencoder,
         ]
 
         if not all(path.exists() for path in required):
@@ -425,24 +429,24 @@ class ModelService:
             except Exception as exc:  # noqa: BLE001
                 LOGGER.warning("Failed to parse meta.json: %s", exc)
 
-        self.transformer = FeedForwardAE(num_features=self.num_features).to(self.device)
+        self.autoencoder = FeedForwardAE(num_features=self.num_features).to(self.device)
         try:
-            state_dict = torch.load(self.paths.transformer, map_location=self.device)
-            self.transformer.load_state_dict(state_dict)
-            self.transformer.eval()
+            state_dict = torch.load(self.paths.autoencoder, map_location=self.device)
+            self.autoencoder.load_state_dict(state_dict)
+            self.autoencoder.eval()
         except Exception as exc:  # noqa: BLE001
             LOGGER.warning("Failed to load feedforward AE weights. Retrain required: %s", exc)
-            self.transformer = None
-        if self.paths.random_forest.exists():
+            self.autoencoder = None
+        if self.paths.lgbm.exists():
             try:
-                self.rf_model = joblib.load(self.paths.random_forest)
+                self.gbm_model = joblib.load(self.paths.lgbm)
             except Exception as exc:  # noqa: BLE001
-                LOGGER.warning("Failed to load RandomForest weights: %s", exc)
-                self.rf_model = None
+                LOGGER.warning("Failed to load LightGBM weights: %s", exc)
+                self.gbm_model = None
         else:
-            self.rf_model = None
+            self.gbm_model = None
 
-        self.model_loaded = all([self.iso_model, self.transformer, self.rf_model])
+        self.model_loaded = all([self.iso_model, self.autoencoder, self.gbm_model])
 
     def _safe_label_encode(self, encoder: LabelEncoder, value: str) -> int:
         classes = set(encoder.classes_.tolist())
@@ -470,13 +474,13 @@ class ModelService:
         return scaled[0]
 
     def _ae_score(self, scaled_vec: np.ndarray) -> Optional[float]:
-        if self.transformer is None:
+        if self.autoencoder is None:
             return None
 
         tensor = torch.tensor(scaled_vec.reshape(1, -1), dtype=torch.float32).to(self.device)
 
         with torch.no_grad():
-            recon = self.transformer(tensor)
+            recon = self.autoencoder(tensor)
         mse = torch.mean((tensor - recon) ** 2).item()
         return float(min(1.0, mse * 10))
 
@@ -513,12 +517,12 @@ class ModelService:
         for vec in scaled:
             iso_score = float(max(0.0, min(1.0, -self.iso_model.decision_function([vec])[0])))
             ae_score = self._ae_score(vec) or 0.0
-            rf_score = (
-                float(self.rf_model.predict_proba([vec])[0][1])
-                if self.rf_model is not None
+            gbm_score = (
+                float(self.gbm_model.predict_proba([vec])[0][1])
+                if self.gbm_model is not None
                 else 0.5
             )
-            scores.append(float(0.4 * iso_score + 0.2 * ae_score + 0.4 * rf_score))
+            scores.append(float(0.4 * iso_score + 0.2 * ae_score + 0.4 * gbm_score))
         return scores
 
     def _persist_score(
@@ -569,7 +573,7 @@ class ModelService:
             "iso_score": 0.0,
             "ae_score": 0.0,
             "hybrid_score": 0.0,
-            "rf_score": 0.5,
+            "gbm_score": 0.5,
         }
 
     def _coerce_uuid(self, value: Optional[object]) -> Optional[UUID]:
