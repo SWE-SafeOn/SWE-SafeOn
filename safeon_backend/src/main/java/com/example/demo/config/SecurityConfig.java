@@ -36,7 +36,8 @@ class SecurityConfig {
                                 "/v3/api-docs/**",
                                 "/swagger-ui/**",
                                 "/api-docs/**",
-                                "/devices/discovery"
+                                "/devices/discovery",
+                                "/ws/**"
                         ).permitAll()
                         .anyRequest().authenticated()
                 )
