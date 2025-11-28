@@ -30,6 +30,7 @@ public class RouterMqttPacketListener implements MqttPacketListener {
     private final MqttProperties mqttProperties;
     private final DeviceRepository deviceRepository;
     private final PacketMetaRepository packetMetaRepository;
+    private final MlRequestPublisher mlRequestPublisher;
     private final ObjectMapper objectMapper;
 
     @Override
@@ -125,6 +126,7 @@ public class RouterMqttPacketListener implements MqttPacketListener {
         if (!entities.isEmpty()) {
             packetMetaRepository.saveAll(entities);
             log.info("Saved {} packet_meta rows from MQTT.", entities.size());
+            mlRequestPublisher.publishPacketMetaJsonl(entities);
         }
     }
 

@@ -25,12 +25,15 @@ public class MlRequestPublisher {
     private final MqttProperties mqttProperties;
     private final ObjectMapper objectMapper;
 
-    
     @Transactional(readOnly = true)
     public void publishPacketMetaJsonl() {
-        String topic = resolveTopic();
         List<PacketMeta> rows = packetMetaRepository.findAll();
-        if (rows.isEmpty()) {
+        publishPacketMetaJsonl(rows);
+    }
+
+    public void publishPacketMetaJsonl(List<PacketMeta> rows) {
+        String topic = resolveTopic();
+        if (rows == null || rows.isEmpty()) {
             log.info("No packet_meta rows to publish to MQTT. topic={}", topic);
             return;
         }
