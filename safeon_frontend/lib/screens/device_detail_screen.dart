@@ -221,6 +221,33 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const SizedBox(height: 6),
+          Wrap(
+            spacing: 10,
+            runSpacing: 8,
+            children: [
+              _buildTrafficStat(
+                label: '현재 PPS',
+                value: _trafficPoints.last.pps,
+                color: SafeOnColors.primary,
+              ),
+              _buildTrafficStat(
+                label: '현재 BPS',
+                value: _trafficPoints.last.bps,
+                color: SafeOnColors.accent,
+              ),
+              _buildTrafficStat(
+                label: '최대 PPS',
+                value: _trafficPoints.map((p) => p.pps).reduce(math.max),
+                color: SafeOnColors.primaryVariant,
+              ),
+              _buildTrafficStat(
+                label: '최대 BPS',
+                value: _trafficPoints.map((p) => p.bps).reduce(math.max),
+                color: SafeOnColors.accent.withValues(alpha: 0.9),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
           SizedBox(
             height: 240,
             child: _buildLineChart(),
@@ -612,6 +639,51 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
     );
   }
 
+  Widget _buildTrafficStat({
+    required String label,
+    required double value,
+    required Color color,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withValues(alpha: 0.2)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 11,
+              color: SafeOnColors.textSecondary,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            _formatMetric(value),
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w800,
+              color: color,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _formatMetric(double value) {
+    if (value < 1) {
+      return value.toStringAsFixed(value < 0.1 ? 2 : 1);
+    }
+    return NumberFormat.compact().format(value);
+  }
+
   Widget _buildLineChart() {
     final spotsPps = _trafficPoints
         .map((point) => FlSpot(
@@ -626,12 +698,29 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
             ))
         .toList();
 
-    final minX = spotsPps.map((e) => e.x).fold<double>(spotsPps.first.x, math.min);
-    final maxX = spotsPps.map((e) => e.x).fold<double>(spotsPps.first.x, math.max);
-    final maxY = [
+    if (spotsPps.isEmpty && spotsBps.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    final allX = _trafficPoints
+        .map((point) => point.timestamp.millisecondsSinceEpoch.toDouble())
+        .toList();
+    final minX = allX.isEmpty ? 0 : allX.reduce(math.min);
+    final maxX = allX.isEmpty ? 0 : allX.reduce(math.max);
+    final maxYValues = [
       ...spotsPps.map((e) => e.y),
       ...spotsBps.map((e) => e.y),
-    ].fold<double>(0, math.max);
+    ];
+    final maxY = maxYValues.isEmpty ? 0 : maxYValues.reduce(math.max);
+
+    final double rangeX = math.max(maxX - minX, 60000).toDouble(); // at least 1 min span
+    final xPadding = rangeX * 0.06;
+    final chartMinX = minX - xPadding;
+    final chartMaxX = maxX + xPadding;
+
+    final chartMaxY = maxY == 0 ? 1.0 : maxY * 1.25;
+    final yInterval = _niceInterval(chartMaxY).clamp(0.0001, double.infinity).toDouble();
+    final bottomInterval = _timeInterval(rangeX).clamp(1, double.infinity).toDouble();
 
     String formatTs(double x) {
       final dt = DateTime.fromMillisecondsSinceEpoch(x.toInt());
@@ -640,23 +729,52 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
 
     return LineChart(
       LineChartData(
-        minX: minX,
-        maxX: maxX,
-        minY: 0,
-        maxY: maxY == 0 ? 1 : maxY * 1.2,
+        backgroundColor: const Color(0xFFF8FAFF),
+        minX: chartMinX,
+        maxX: chartMaxX,
+        minY: 0.0,
+        maxY: chartMaxY,
         gridData: FlGridData(
           show: true,
-          horizontalInterval:
-              ((maxY == 0 ? 1 : maxY / 4).clamp(0.1, double.infinity)).toDouble(),
+          horizontalInterval: yInterval,
+          verticalInterval: bottomInterval,
           getDrawingHorizontalLine: (value) => FlLine(
             color: Colors.grey.shade200,
-            strokeWidth: 1,
+            strokeWidth: 1.0,
           ),
-          drawVerticalLine: false,
+          getDrawingVerticalLine: (value) => FlLine(
+            color: Colors.grey.shade200.withValues(alpha: 0.55),
+            strokeWidth: 0.6,
+            dashArray: const [4, 6],
+          ),
+          drawVerticalLine: true,
         ),
         borderData: FlBorderData(
           show: true,
-          border: Border.all(color: Colors.grey.shade300),
+          border: Border.all(color: Colors.grey.shade300.withValues(alpha: 0.8)),
+        ),
+        lineTouchData: LineTouchData(
+          handleBuiltInTouches: true,
+          touchTooltipData: LineTouchTooltipData(
+            getTooltipColor: (_) => Colors.white,
+            tooltipRoundedRadius: 10.0,
+            fitInsideHorizontally: true,
+            fitInsideVertically: true,
+            getTooltipItems: (touchedSpots) {
+              return touchedSpots.map((barSpot) {
+                final timeLabel = formatTs(barSpot.x);
+                final valueLabel = _formatMetric(barSpot.y);
+                final color = barSpot.bar.gradient?.colors.first ?? barSpot.bar.color;
+                return LineTooltipItem(
+                  '$timeLabel\n$valueLabel',
+                  TextStyle(
+                    color: color ?? SafeOnColors.textPrimary,
+                    fontWeight: FontWeight.w700,
+                  ),
+                );
+              }).toList();
+            },
+          ),
         ),
         titlesData: FlTitlesData(
           rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
@@ -664,9 +782,9 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
           leftTitles: AxisTitles(
             sideTitles: SideTitles(
               showTitles: true,
-              reservedSize: 42,
+              reservedSize: 46.0,
               getTitlesWidget: (value, _) => Text(
-                value.toStringAsFixed(0),
+                _formatMetric(value),
                 style: const TextStyle(fontSize: 11, color: SafeOnColors.textSecondary),
               ),
             ),
@@ -674,8 +792,8 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
           bottomTitles: AxisTitles(
             sideTitles: SideTitles(
               showTitles: true,
-              interval: ((maxX - minX) / 4).clamp(1, double.infinity),
-              reservedSize: 30,
+              interval: bottomInterval,
+              reservedSize: 30.0,
               getTitlesWidget: (value, _) => Padding(
                 padding: const EdgeInsets.only(top: 4),
                 child: Text(
@@ -689,29 +807,97 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
         lineBarsData: [
           LineChartBarData(
             spots: spotsPps,
-            color: SafeOnColors.primary,
-            barWidth: 3,
+            gradient: const LinearGradient(
+              colors: [SafeOnColors.primary, SafeOnColors.primaryVariant],
+              begin: Alignment.centerLeft,
+              end: Alignment.centerRight,
+            ),
+            barWidth: 3.0,
             isCurved: true,
             dotData: const FlDotData(show: false),
             belowBarData: BarAreaData(
               show: true,
-              color: SafeOnColors.primary.withValues(alpha: 0.12),
+              gradient: LinearGradient(
+                colors: [
+                  SafeOnColors.primary.withValues(alpha: 0.16),
+                  SafeOnColors.primary.withValues(alpha: 0.08),
+                ],
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+              ),
             ),
           ),
           LineChartBarData(
             spots: spotsBps,
-            color: SafeOnColors.accent,
-            barWidth: 3,
+            gradient: const LinearGradient(
+              colors: [SafeOnColors.accent, Color(0xFFFFD384)],
+              begin: Alignment.centerLeft,
+              end: Alignment.centerRight,
+            ),
+            barWidth: 3.0,
             isCurved: true,
             dotData: const FlDotData(show: false),
             belowBarData: BarAreaData(
               show: true,
-              color: SafeOnColors.accent.withValues(alpha: 0.12),
+              gradient: LinearGradient(
+                colors: [
+                  SafeOnColors.accent.withValues(alpha: 0.18),
+                  SafeOnColors.accent.withValues(alpha: 0.08),
+                ],
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+              ),
             ),
           ),
         ],
+        extraLinesData: ExtraLinesData(
+          horizontalLines: [
+            HorizontalLine(
+              y: chartMaxY * 0.65,
+              color: Colors.grey.shade400.withValues(alpha: 0.18),
+              strokeWidth: 1.0,
+              dashArray: const [5, 6],
+            ),
+          ],
+        ),
       ),
     );
+  }
+
+  double _niceInterval(double maxValue) {
+    if (maxValue <= 1) return 1;
+    final approx = maxValue / 4;
+    final exponent = (math.log(approx) / math.ln10).floor();
+    final magnitude = math.pow(10, exponent).toDouble();
+    final residual = approx / magnitude;
+
+    double nice;
+    if (residual < 1.5) {
+      nice = 1;
+    } else if (residual < 3) {
+      nice = 2;
+    } else if (residual < 7) {
+      nice = 5;
+    } else {
+      nice = 10;
+    }
+    return nice * magnitude;
+  }
+
+  double _timeInterval(double spanMs) {
+    const steps = [
+      60000, // 1m
+      300000, // 5m
+      600000, // 10m
+      900000, // 15m
+      1800000, // 30m
+      3600000, // 60m
+    ];
+    final target = spanMs / 4;
+    for (final step in steps) {
+      if (target <= step) return step.toDouble();
+    }
+    return steps.last.toDouble();
   }
 
   IconData _iconFromName(String name) {
