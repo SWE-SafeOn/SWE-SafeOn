@@ -611,8 +611,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
             icon: Icons.lock_clock,
             title: '매일 자동 활성화',
             subtitle: _isNightlyAutoArmEnabled
-                ? 'SafeOn을 매일 자동으로 켜요'
-                : '자동 활성화 일정이 일시 중지됨',
+                ? 'SafeOn을 자동으로 켜요'
+                : '자동 활성화 일시 중지',
             trailing: Switch(
               value: _isNightlyAutoArmEnabled,
               onChanged: (value) {
@@ -630,7 +630,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             title: '자동화 루틴',
             subtitle: _isAutomationActive
                 ? '루틴이 일정대로 실행 중'
-                : '자동화가 일시 중지됨',
+                : '자동화가 일시 중지',
             trailing: Switch(
               value: _isAutomationActive,
               onChanged: (value) {
