@@ -661,7 +661,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     children: [
                       Text(_profile.name, style: theme.textTheme.titleLarge),
                       const SizedBox(height: 4),
-                      Text(_profile.email, style: theme.textTheme.bodyMedium),
+                      Text(_profile.email, style: theme.textTheme.bodySmall),
                     ],
                   ),
                 ),
