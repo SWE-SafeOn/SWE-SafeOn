@@ -6,14 +6,19 @@ import com.example.demo.dto.dashboard.DashboardDeviceDto;
 import com.example.demo.dto.dashboard.DashboardDeviceListResponseDto;
 import com.example.demo.dto.dashboard.DashboardOverviewDto;
 import com.example.demo.dto.dashboard.RecentAlertListResponseDto;
+import com.example.demo.dto.dashboard.DailyAnomalyCountResponseDto;
 import com.example.demo.repository.UserAlertRepository;
 import com.example.demo.repository.UserDeviceRepository;
+import com.example.demo.repository.AnomalyScoreRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.time.Duration;
+import java.time.LocalDate;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -28,6 +33,7 @@ public class DashboardService {
 
     private final UserDeviceRepository userDeviceRepository;
     private final UserAlertRepository userAlertRepository;
+    private final AnomalyScoreRepository anomalyScoreRepository;
     private final ConcurrentMap<UUID, List<SseEmitter>> emitters = new ConcurrentHashMap<>();
 
     @Transactional(readOnly = true)
@@ -69,6 +75,13 @@ public class DashboardService {
                 .map(AlertResponseDto::from)
                 .toList();
         return new RecentAlertListResponseDto(alerts);
+    }
+
+    @Transactional(readOnly = true)
+    public DailyAnomalyCountResponseDto getDailyAnomalyCounts(LocalDate startDate, LocalDate endDate) {
+        OffsetDateTime start = startDate != null ? startDate.atStartOfDay().atOffset(ZoneOffset.UTC) : null;
+        OffsetDateTime end = endDate != null ? endDate.plusDays(1).atStartOfDay().atOffset(ZoneOffset.UTC) : null;
+        return new DailyAnomalyCountResponseDto(anomalyScoreRepository.countDailyAnomalies(start, end));
     }
 
     public SseEmitter stream(UUID userId) {

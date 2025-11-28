@@ -4,6 +4,7 @@ import com.example.demo.dto.ApiResponseDto;
 import com.example.demo.dto.dashboard.DashboardDeviceListResponseDto;
 import com.example.demo.dto.dashboard.DashboardOverviewDto;
 import com.example.demo.dto.dashboard.RecentAlertListResponseDto;
+import com.example.demo.dto.dashboard.DailyAnomalyCountResponseDto;
 import com.example.demo.security.AuthenticatedUser;
 import com.example.demo.service.DashboardService;
 
@@ -12,11 +13,14 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
+
+import java.time.LocalDate;
 
 @RestController
 @RequiredArgsConstructor
@@ -49,6 +53,16 @@ public class DashboardController {
     ) {
         RecentAlertListResponseDto alerts = dashboardService.getRecentAlerts(currentUser.userId(), limit);
         return ResponseEntity.ok(ApiResponseDto.ok(alerts));
+    }
+
+    // 하루동안의 이상치 탐지 개수
+    @GetMapping("/anomalies/daily")
+    public ResponseEntity<ApiResponseDto<DailyAnomalyCountResponseDto>> getDailyAnomalyCounts(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate
+    ) {
+        DailyAnomalyCountResponseDto data = dashboardService.getDailyAnomalyCounts(startDate, endDate);
+        return ResponseEntity.ok(ApiResponseDto.ok(data));
     }
 
     @GetMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
