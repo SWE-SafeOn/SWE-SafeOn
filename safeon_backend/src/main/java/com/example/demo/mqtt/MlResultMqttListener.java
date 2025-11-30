@@ -115,8 +115,8 @@ public class MlResultMqttListener implements MqttPacketListener {
         anomalyScoreRepository.save(score);
 
         if (device != null) {
-            userDeviceRepository.findFirstByDeviceDeviceId(device.getDeviceId())
-                    .ifPresent(userDevice -> {
+            userDeviceRepository.findAllByDeviceDeviceId(device.getDeviceId())
+                    .forEach(userDevice -> {
                         UserAlert userAlert = userAlertRepository.save(UserAlert.create(
                                 userDevice.getUser(),
                                 savedAlert,
