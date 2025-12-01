@@ -711,8 +711,11 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
           .toDouble();
       final nowMs = DateTime.now().millisecondsSinceEpoch.toDouble();
 
+      final firstValue = selector(_trafficPoints.first);
+      final lastValue = selector(_trafficPoints.last);
+
       final spots = <FlSpot>[
-        FlSpot(start, selector(_trafficPoints.first)),
+        FlSpot(start, firstValue),
         ..._trafficPoints.map(
           (point) => FlSpot(
             point.timestamp.millisecondsSinceEpoch.toDouble(),
@@ -724,7 +727,7 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
       final last = _trafficPoints.last;
       final lastMs = last.timestamp.millisecondsSinceEpoch.toDouble();
       if (nowMs > lastMs) {
-        spots.add(FlSpot(nowMs, selector(last)));
+        spots.add(FlSpot(nowMs, lastValue));
       }
 
       return spots;
@@ -754,7 +757,7 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
     final chartMinX = minX - xPadding;
     final chartMaxX = maxX + xPadding;
 
-    final chartMaxY = _niceCeil(maxY);
+    final chartMaxY = _niceCeil((maxY <= 0 ? 1 : maxY) * 1.12);
     final yInterval = _niceInterval(chartMaxY, targetTickCount: 5)
         .clamp(0.0001, double.infinity)
         .toDouble();
@@ -765,138 +768,159 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
       return DateFormat('HH:mm').format(dt);
     }
 
-    return LineChart(
-      LineChartData(
-        backgroundColor: const Color(0xFFF8FAFF),
-        minX: chartMinX,
-        maxX: chartMaxX,
-        minY: 0.0,
-        maxY: chartMaxY,
-        gridData: FlGridData(
-          show: true,
-          horizontalInterval: yInterval,
-          verticalInterval: bottomInterval,
-          getDrawingHorizontalLine: (value) => FlLine(
-            color: Colors.grey.shade200,
-            strokeWidth: 1.0,
-          ),
-          getDrawingVerticalLine: (value) => FlLine(
-            color: Colors.grey.shade200.withValues(alpha: 0.55),
-            strokeWidth: 0.6,
-            dashArray: const [4, 6],
-          ),
-          drawVerticalLine: true,
-        ),
-        borderData: FlBorderData(
-          show: true,
-          border: Border.all(color: Colors.grey.shade300.withValues(alpha: 0.8)),
-        ),
-        lineTouchData: LineTouchData(
-          handleBuiltInTouches: true,
-          touchTooltipData: LineTouchTooltipData(
-            getTooltipColor: (_) => Colors.white,
-            tooltipRoundedRadius: 10.0,
-            fitInsideHorizontally: true,
-            fitInsideVertically: true,
-            getTooltipItems: (touchedSpots) {
-              return touchedSpots.map((barSpot) {
-                final timeLabel = formatTs(barSpot.x);
-                final valueLabel = _formatMetric(barSpot.y);
-                final color = barSpot.bar.gradient?.colors.first ?? barSpot.bar.color;
-                return LineTooltipItem(
-                  '$timeLabel\n$valueLabel',
-                  TextStyle(
-                    color: color ?? SafeOnColors.textPrimary,
-                    fontWeight: FontWeight.w700,
-                  ),
-                );
-              }).toList();
-            },
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(16),
+      child: DecoratedBox(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            colors: [Color(0xFFFDFEFF), Color(0xFFF0F4FF)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
           ),
         ),
-        titlesData: FlTitlesData(
-          rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-          topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-          leftTitles: AxisTitles(
-            sideTitles: SideTitles(
-              showTitles: true,
-              reservedSize: 46.0,
-              getTitlesWidget: (value, _) => Text(
-                '${_formatMetric(value)}',
-                style: const TextStyle(fontSize: 11, color: SafeOnColors.textSecondary),
-              ),
-            ),
-          ),
-          bottomTitles: AxisTitles(
-            sideTitles: SideTitles(
-              showTitles: true,
-              interval: bottomInterval,
-              reservedSize: 30.0,
-              getTitlesWidget: (value, _) => Padding(
-                padding: const EdgeInsets.only(top: 4),
-                child: Text(
-                  formatTs(value),
-                  style: const TextStyle(fontSize: 11, color: SafeOnColors.textSecondary),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(10, 8, 6, 6),
+          child: LineChart(
+            LineChartData(
+              clipData: const FlClipData.all(),
+              backgroundColor: Colors.transparent,
+              minX: chartMinX,
+              maxX: chartMaxX,
+              minY: 0.0,
+              maxY: chartMaxY,
+              gridData: FlGridData(
+                show: true,
+                drawVerticalLine: true,
+                horizontalInterval: yInterval,
+                verticalInterval: bottomInterval,
+                getDrawingHorizontalLine: (_) => FlLine(
+                  color: Colors.grey.shade300.withValues(alpha: 0.7),
+                  strokeWidth: 0.8,
+                ),
+                getDrawingVerticalLine: (_) => FlLine(
+                  color: Colors.grey.shade200.withValues(alpha: 0.7),
+                  strokeWidth: 0.6,
+                  dashArray: const [5, 8],
                 ),
               ),
-            ),
-          ),
-        ),
-        lineBarsData: [
-          LineChartBarData(
-            spots: spotsPps,
-            gradient: const LinearGradient(
-              colors: [SafeOnColors.primary, SafeOnColors.primaryVariant],
-              begin: Alignment.centerLeft,
-              end: Alignment.centerRight,
-            ),
-            barWidth: 3.0,
-            isCurved: true,
-            dotData: const FlDotData(show: false),
-            belowBarData: BarAreaData(
-              show: true,
-              gradient: LinearGradient(
-                colors: [
-                  SafeOnColors.primary.withValues(alpha: 0.16),
-                  SafeOnColors.primary.withValues(alpha: 0.08),
+              borderData: FlBorderData(
+                show: true,
+                border: Border.all(color: Colors.grey.shade300.withValues(alpha: 0.85)),
+              ),
+              lineTouchData: LineTouchData(
+                handleBuiltInTouches: true,
+                touchTooltipData: LineTouchTooltipData(
+                  tooltipPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  tooltipRoundedRadius: 12.0,
+                  getTooltipColor: (_) => Colors.white,
+                  fitInsideHorizontally: true,
+                  fitInsideVertically: true,
+                  getTooltipItems: (touchedSpots) {
+                    return touchedSpots.map((barSpot) {
+                      final timeLabel = formatTs(barSpot.x);
+                      final valueLabel = _formatMetric(barSpot.y);
+                      final color = barSpot.bar.gradient?.colors.first ?? barSpot.bar.color;
+                      return LineTooltipItem(
+                        '$timeLabel\n$valueLabel',
+                        TextStyle(
+                          color: color ?? SafeOnColors.textPrimary,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      );
+                    }).toList();
+                  },
+                ),
+              ),
+              titlesData: FlTitlesData(
+                rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                leftTitles: AxisTitles(
+                  sideTitles: SideTitles(
+                    showTitles: true,
+                    reservedSize: 48.0,
+                    getTitlesWidget: (value, _) => Text(
+                      _formatMetric(value),
+                      style: const TextStyle(fontSize: 11, color: SafeOnColors.textSecondary),
+                    ),
+                  ),
+                ),
+                bottomTitles: AxisTitles(
+                  sideTitles: SideTitles(
+                    showTitles: true,
+                    interval: bottomInterval,
+                    reservedSize: 30.0,
+                    getTitlesWidget: (value, _) => Padding(
+                      padding: const EdgeInsets.only(top: 6),
+                      child: Text(
+                        formatTs(value),
+                        style: const TextStyle(fontSize: 11, color: SafeOnColors.textSecondary),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              lineBarsData: [
+                LineChartBarData(
+                  spots: spotsPps,
+                  gradient: const LinearGradient(
+                    colors: [SafeOnColors.primary, SafeOnColors.primaryVariant],
+                    begin: Alignment.centerLeft,
+                    end: Alignment.centerRight,
+                  ),
+                  barWidth: 3.6,
+                  isCurved: true,
+                  isStrokeCapRound: true,
+                  preventCurveOverShooting: true,
+                  dotData: const FlDotData(show: false),
+                  belowBarData: BarAreaData(
+                    show: true,
+                    gradient: LinearGradient(
+                      colors: [
+                        SafeOnColors.primary.withValues(alpha: 0.18),
+                        SafeOnColors.primary.withValues(alpha: 0.06),
+                      ],
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                    ),
+                  ),
+                ),
+                LineChartBarData(
+                  spots: spotsBps,
+                  gradient: const LinearGradient(
+                    colors: [SafeOnColors.accent, Color(0xFFFFD384)],
+                    begin: Alignment.centerLeft,
+                    end: Alignment.centerRight,
+                  ),
+                  barWidth: 3.6,
+                  isCurved: true,
+                  isStrokeCapRound: true,
+                  preventCurveOverShooting: true,
+                  dotData: const FlDotData(show: false),
+                  belowBarData: BarAreaData(
+                    show: true,
+                    gradient: LinearGradient(
+                      colors: [
+                        SafeOnColors.accent.withValues(alpha: 0.2),
+                        SafeOnColors.accent.withValues(alpha: 0.08),
+                      ],
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                    ),
+                  ),
+                ),
+              ],
+              extraLinesData: ExtraLinesData(
+                horizontalLines: [
+                  HorizontalLine(
+                    y: chartMaxY * 0.65,
+                    color: Colors.grey.shade400.withValues(alpha: 0.18),
+                    strokeWidth: 1.0,
+                    dashArray: const [5, 6],
+                  ),
                 ],
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
               ),
             ),
           ),
-          LineChartBarData(
-            spots: spotsBps,
-            gradient: const LinearGradient(
-              colors: [SafeOnColors.accent, Color(0xFFFFD384)],
-              begin: Alignment.centerLeft,
-              end: Alignment.centerRight,
-            ),
-            barWidth: 3.0,
-            isCurved: true,
-            dotData: const FlDotData(show: false),
-            belowBarData: BarAreaData(
-              show: true,
-              gradient: LinearGradient(
-                colors: [
-                  SafeOnColors.accent.withValues(alpha: 0.18),
-                  SafeOnColors.accent.withValues(alpha: 0.08),
-                ],
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-              ),
-            ),
-          ),
-        ],
-        extraLinesData: ExtraLinesData(
-          horizontalLines: [
-            HorizontalLine(
-              y: chartMaxY * 0.65,
-              color: Colors.grey.shade400.withValues(alpha: 0.18),
-              strokeWidth: 1.0,
-              dashArray: const [5, 6],
-            ),
-          ],
         ),
       ),
     );
