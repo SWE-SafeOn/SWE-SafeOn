@@ -37,6 +37,7 @@ public class RouterMqttPacketListener implements MqttPacketListener {
     @Transactional
     public void onPacketReceived(String topic, byte[] payload) {
         String message = new String(payload, StandardCharsets.UTF_8);
+        log.info("MQTT message received. topic={}, payload={}", topic, message);
         try {
             if (matches(topic, mqttProperties.getDeviceTopic())) {
                 handleDeviceDiscovery(message);
