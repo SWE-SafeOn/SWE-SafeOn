@@ -218,31 +218,35 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const SizedBox(height: 6),
-          Wrap(
-            spacing: 10,
-            runSpacing: 8,
-            children: [
-              _buildTrafficStat(
-                label: '현재 PPS',
-                value: _trafficPoints.last.pps,
-                color: SafeOnColors.primary,
-              ),
-              _buildTrafficStat(
-                label: '현재 BPS',
-                value: _trafficPoints.last.bps,
-                color: SafeOnColors.accent,
-              ),
-              _buildTrafficStat(
-                label: '최대 PPS',
-                value: _trafficPoints.map((p) => p.pps).reduce(math.max),
-                color: SafeOnColors.primaryVariant,
-              ),
-              _buildTrafficStat(
-                label: '최대 BPS',
-                value: _trafficPoints.map((p) => p.bps).reduce(math.max),
-                color: SafeOnColors.accent.withValues(alpha: 0.9),
-              ),
-            ],
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                _buildTrafficStat(
+                  label: '현재 PPS',
+                  value: _trafficPoints.last.pps,
+                  color: SafeOnColors.primary,
+                ),
+                const SizedBox(width: 10),
+                _buildTrafficStat(
+                  label: '현재 BPS',
+                  value: _trafficPoints.last.bps,
+                  color: SafeOnColors.accent,
+                ),
+                const SizedBox(width: 10),
+                _buildTrafficStat(
+                  label: '최대 PPS',
+                  value: _trafficPoints.map((p) => p.pps).reduce(math.max),
+                  color: SafeOnColors.primaryVariant,
+                ),
+                const SizedBox(width: 10),
+                _buildTrafficStat(
+                  label: '최대 BPS',
+                  value: _trafficPoints.map((p) => p.bps).reduce(math.max),
+                  color: SafeOnColors.accent.withValues(alpha: 0.9),
+                ),
+              ],
+            ),
           ),
           const SizedBox(height: 12),
           SizedBox(

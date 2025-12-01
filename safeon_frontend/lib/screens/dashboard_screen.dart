@@ -531,7 +531,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               _InsightCard(
                 title: '누적 알림',
                 value: '${_alerts.length}',
-                caption: '마지막:$lastAlertLabel',
+                caption: '마지막$lastAlertLabel',
                 icon: Icons.warning_amber,
                 accent: SafeOnColors.accent,
                 onTap: () => setState(() => _selectedIndex = 1),
