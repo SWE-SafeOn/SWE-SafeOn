@@ -476,7 +476,7 @@ class ModelService:
 
         scaled_vec = self._transform_flow(flow)
         flow_key = self._flow_key(flow)
-        sequence = self._append_sequence(flow_key, scaled_vec)
+        sequence = self._append_sequence(flow_key, scaled_vec, require_full=False)
 
         # IsolationForest와 LSTM AE + RandomForest 점수를 혼합해 최종 hybrid 이상 점수를 만든다.
         iso_score = self._iso_score(scaled_vec)
@@ -594,6 +594,7 @@ class ModelService:
         key: str,
         vec: np.ndarray,
         buffers: Optional[Dict[str, Deque[np.ndarray]]] = None,
+        require_full: bool = True,
     ) -> Optional[np.ndarray]:
         target = buffers if buffers is not None else self.sequence_buffers
         seq = target.get(key)
@@ -601,8 +602,14 @@ class ModelService:
             seq = deque(maxlen=self.seq_len)
             target[key] = seq
         seq.append(vec)
-        if len(seq) == self.seq_len:
-            return np.stack(seq, axis=0)
+        if len(seq) >= self.seq_len:
+            return np.stack(list(seq)[-self.seq_len :], axis=0)
+        if not require_full and len(seq) > 0:
+            # Pad with the most recent vector so AE can run with partial history.
+            current = list(seq)
+            pad_vec = current[-1]
+            padding = [pad_vec] * (self.seq_len - len(current))
+            return np.stack(current + padding, axis=0)
         return None
 
     def _resolve_flow_deltas(
