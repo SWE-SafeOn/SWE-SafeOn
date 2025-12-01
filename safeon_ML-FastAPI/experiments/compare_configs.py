@@ -13,20 +13,6 @@ TMP_TRAIN = Path("/tmp/safeon_train_subset.csv")
 
 CONFIGS = [
     {"name": "1번", "contamination": 0.05, "epochs": 16, "batch": 32},
-    {"name": "2번", "contamination": 0.05, "epochs": 20, "batch": 32},
-    {"name": "3번", "contamination": 0.05, "epochs": 24, "batch": 32},
-    {"name": "4번", "contamination": 0.05, "epochs": 16, "batch": 64},
-    {"name": "5번", "contamination": 0.05, "epochs": 20, "batch": 64},
-    {"name": "6번", "contamination": 0.05, "epochs": 24, "batch": 64},
-    {"name": "7번", "contamination": 0.03, "epochs": 16, "batch": 32},
-    {"name": "8번", "contamination": 0.03, "epochs": 20, "batch": 32},
-    {"name": "9번", "contamination": 0.03, "epochs": 20, "batch": 64},
-    {"name": "10번", "contamination": 0.03, "epochs": 24, "batch": 64},
-    {"name": "11번", "contamination": 0.10, "epochs": 16, "batch": 32},
-    {"name": "12번", "contamination": 0.10, "epochs": 20, "batch": 32},
-    {"name": "12번", "contamination": 0.10, "epochs": 16, "batch": 64},
-    {"name": "13번", "contamination": 0.10, "epochs": 20, "batch": 64},
-    {"name": "14번", "contamination": 0.10, "epochs": 24, "batch": 64}
 ]
 
 

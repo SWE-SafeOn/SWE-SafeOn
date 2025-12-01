@@ -233,7 +233,7 @@ class ModelService:
     # ---------------------------------------------------
     # Training
     # ---------------------------------------------------
-    def train(self, dataset_path: Optional[Path] = None, epochs: int = 16, batch_size: int = 32) -> Dict[str, str]:
+    def train(self, dataset_path: Optional[Path] = None, epochs: int = 20, batch_size: int = 32) -> Dict[str, str]:
         path = Path(dataset_path or self.dataset_path)
         if not path.exists():
             raise FileNotFoundError(f"Dataset not found at {path}")
@@ -385,12 +385,13 @@ class ModelService:
             except Exception as exc:  # noqa: BLE001
                 LOGGER.warning("LightGBM prediction failed: %s", exc)
         gbm_contrib = gbm_score if gbm_score is not None else 0.5
-        hybrid_score = float(0.4 * iso_score + 0.2 * ae_score + 0.4 * gbm_contrib)
+        hybrid_score = float(iso_score + ae_score + gbm_contrib)/3
         is_anom = hybrid_score >= self.threshold
         record_id = self._persist_score(
             ts=ts,
             iso_score=iso_score,
             ae_score=ae_score,
+            gbm_score=gbm_score,
             hybrid_score=hybrid_score,
             is_anom=is_anom,
             user_id=user_id,
@@ -544,7 +545,7 @@ class ModelService:
                 if self.gbm_model is not None
                 else 0.5
             )
-            scores.append(float(0.4 * iso_score + 0.2 * ae_score + 0.4 * gbm_score))
+            scores.append(float(iso_score + ae_score + gbm_score)/3)
         return scores
 
     def _persist_score(
@@ -552,6 +553,7 @@ class ModelService:
         ts: datetime,
         iso_score: float,
         ae_score: float,
+        gbm_score: Optional[float],
         hybrid_score: float,
         is_anom: bool,
         user_id: Optional[str],
@@ -568,6 +570,7 @@ class ModelService:
             "alert_id": None,
             "iso_score": iso_score,
             "ae_score": ae_score,
+            "gbm_score": gbm_score,
             "hybrid_score": hybrid_score,
             "is_anom": is_anom,
         }
@@ -575,9 +578,9 @@ class ModelService:
         query = text(
             """
             INSERT INTO anomaly_scores (
-                score_id, ts, packet_meta_id, alert_id, iso_score, ae_score, hybrid_score, is_anom
+                score_id, ts, packet_meta_id, alert_id, iso_score, ae_score, gbm_score, hybrid_score, is_anom
             )
-            VALUES (:score_id, :ts, :packet_meta_id, :alert_id, :iso_score, :ae_score, :hybrid_score, :is_anom)
+            VALUES (:score_id, :ts, :packet_meta_id, :alert_id, :iso_score, :ae_score, :gbm_score, :hybrid_score, :is_anom)
             """
         )
 
