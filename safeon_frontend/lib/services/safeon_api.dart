@@ -358,6 +358,26 @@ class SafeOnApiClient {
     );
   }
 
+  Future<void> acknowledgeAlert({
+    required String token,
+    required String alertId,
+  }) async {
+    final response = await _httpClient.post(
+      _uri('/alerts/$alertId/ack'),
+      headers: _jsonHeaders(token: token),
+    );
+
+    if (response.statusCode == 200 || response.statusCode == 204) {
+      return;
+    }
+
+    final body = _decode(response);
+    throw ApiException(
+      _extractError(body) ?? '알림을 읽음 처리하지 못했습니다.',
+      response.statusCode,
+    );
+  }
+
   Future<void> enableMlModel(String token) async {
     final response = await _httpClient.post(
       _uri('/ml/enable'),

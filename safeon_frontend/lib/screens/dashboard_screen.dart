@@ -44,6 +44,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   List<SafeOnDevice> _devices = const [];
   List<SafeOnAlert> _alerts = const [];
   final Set<String> _knownAlertIds = {};
+  final Set<String> _acknowledgingAlertIds = {};
   bool _hasLoadedInitialAlerts = false;
   bool _isLoading = true;
   String? _errorMessage;
@@ -220,13 +221,60 @@ class _DashboardScreenState extends State<DashboardScreen> {
         .toList();
   }
 
-  void _markAlertAsRead(SafeOnAlert alert) {
-    if (alert.read == true) return;
+  Future<void> _acknowledgeAlert(SafeOnAlert alert) async {
+    if (alert.id.isEmpty || _acknowledgingAlertIds.contains(alert.id)) return;
+
+    final wasRead = alert.read == true;
     setState(() {
+      _acknowledgingAlertIds.add(alert.id);
       _alerts = _alerts
-          .map((item) => item.id == alert.id ? item.copyWith(read: true) : item)
+          .map((item) =>
+              item.id == alert.id ? item.copyWith(read: true) : item)
           .toList();
     });
+
+    try {
+      await widget.apiClient.acknowledgeAlert(
+        token: widget.session.token,
+        alertId: alert.id,
+      );
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      if (!wasRead) {
+        setState(() {
+          _alerts = _alerts
+              .map((item) => item.id == alert.id
+                  ? item.copyWith(read: false)
+                  : item)
+              .toList();
+        });
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.message)),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      if (!wasRead) {
+        setState(() {
+          _alerts = _alerts
+              .map((item) => item.id == alert.id
+                  ? item.copyWith(read: false)
+                  : item)
+              .toList();
+        });
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('알림을 읽음 처리하지 못했어요. 다시 시도해주세요.'),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _acknowledgingAlertIds.remove(alert.id);
+        });
+      }
+    }
   }
 
   Future<void> _handleHomeModeToggle(bool enable) async {
@@ -556,7 +604,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     padding: const EdgeInsets.only(bottom: 10),
                     child: AlertTile(
                       alert: alert,
-                      onTap: () => _markAlertAsRead(alert),
+                      onTap: () => _acknowledgeAlert(alert),
+                      isAcknowledging:
+                          _acknowledgingAlertIds.contains(alert.id),
                     ),
                   ),
                 )
@@ -584,7 +634,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
       itemCount: _alerts.length,
       itemBuilder: (context, index) => AlertTile(
         alert: _alerts[index],
-        onTap: () => _markAlertAsRead(_alerts[index]),
+        onTap: () => _acknowledgeAlert(_alerts[index]),
+        isAcknowledging:
+            _acknowledgingAlertIds.contains(_alerts[index].id),
       ),
     );
   }

@@ -150,8 +150,6 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
                 _buildMetaItem(Icons.place_outlined, widget.device.locationLabel),
                 const SizedBox(width: 12),
                 _buildMetaItem(Icons.language, widget.device.ip),
-                const SizedBox(width: 12),
-                _buildMetaItem(Icons.qr_code_2, widget.device.macAddress),
               ],
             ),
           ),
@@ -166,9 +164,8 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
       children: [
         _buildSectionTitle('디바이스 정보'),
         const SizedBox(height: 8),
-        _buildMetaRow(Icons.system_update, '마지막 펌웨어 체크', '오늘 09:12'),
+        _buildMetaRow(Icons.system_update, '기기 등록 시간', _formattedAddedAt()),
         _buildMetaRow(Icons.language, 'IP 주소', widget.device.ip),
-        _buildMetaRow(Icons.qr_code_2, 'MAC 주소', widget.device.macAddress),
         _buildMetaRow(Icons.numbers, '시리얼 번호', widget.device.id.isNotEmpty ? widget.device.id : '할당되지 않음'),
       ],
     );
@@ -552,6 +549,12 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
         ),
       ],
     );
+  }
+
+    String _formattedAddedAt() {
+    final addedAt = widget.device.linkedAt ?? widget.device.createdAt;
+    if (addedAt == null) return '정보 없음';
+    return DateFormat('yyyy-MM-dd HH:mm').format(addedAt.toLocal());
   }
 
   Widget _buildDeviceAvatar() {
