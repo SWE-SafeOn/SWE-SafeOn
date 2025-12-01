@@ -78,6 +78,8 @@ class FlowFeatures(BaseModel):
     bps: float
     start_time: Optional[float] = None
     end_time: Optional[float] = None
+    pps_delta: Optional[float] = None
+    bps_delta: Optional[float] = None
 
     @validator("start_time", "end_time", pre=True)
     def parse_timestamp(cls, v) -> Optional[float]:  # noqa: D417
@@ -127,6 +129,8 @@ class FlowFeatures(BaseModel):
             "duration": self.duration,
             "pps": self.pps,
             "bps": self.bps,
+            "pps_delta": 0.0 if self.pps_delta is None else self.pps_delta,
+            "bps_delta": 0.0 if self.bps_delta is None else self.bps_delta,
         }
         return pd.DataFrame([data])[feature_order]
 
@@ -149,7 +153,7 @@ class ArtifactPaths:
 class ModelService:
     """Wraps preprocessing, model inference, and DB persistence."""
 
-    feature_columns = [
+    base_feature_columns = [
         "src_ip",
         "dst_ip",
         "src_port",
@@ -161,6 +165,7 @@ class ModelService:
         "pps",
         "bps",
     ]
+    feature_columns = base_feature_columns + ["pps_delta", "bps_delta"]
 
     def __init__(
         self,
@@ -206,6 +211,7 @@ class ModelService:
         self.iso_decision_max: float = 1.0
         self.engine = create_engine(self.database_url) if self.database_url else None
         self.model_loaded = False
+        self.prev_flow_stats: Dict[Tuple[str, str, int, int, str], Tuple[float, float]] = {}
 
         os.makedirs(self.model_dir, exist_ok=True)
         self._load_artifacts()
@@ -240,14 +246,22 @@ class ModelService:
 
         LOGGER.info("Loading dataset from %s", path)
         df = pd.read_csv(path)
-        missing = [c for c in self.feature_columns + ["label"] if c not in df.columns]
+        missing = [c for c in self.base_feature_columns + ["label"] if c not in df.columns]
         if missing:
             raise ValueError(f"Dataset is missing required columns: {', '.join(missing)}")
 
-        df = df.dropna(subset=self.feature_columns + ["label"]).copy()
+        df = df.dropna(subset=self.base_feature_columns + ["label"]).copy()
         df["proto"] = df["proto"].astype(str).str.upper()
-        df["pps"] = np.log1p(df["pps"].astype(float))
-        df["bps"] = np.log1p(df["bps"].astype(float))
+        df["src_port"] = df["src_port"].astype(int)
+        df["dst_port"] = df["dst_port"].astype(int)
+        df["packet_count"] = df["packet_count"].astype(int)
+        df["byte_count"] = df["byte_count"].astype(int)
+        df["duration"] = df["duration"].astype(float)
+        df["pps"] = df["pps"].astype(float)
+        df["bps"] = df["bps"].astype(float)
+        df = self._inject_rate_deltas(df)
+        df["pps"] = np.log1p(df["pps"])
+        df["bps"] = np.log1p(df["bps"])
 
         # 문자열 기반 특성은 라벨 인코더로 숫자형으로 치환한다.
         self.enc_src_ip = LabelEncoder().fit(df["src_ip"])
@@ -266,6 +280,8 @@ class ModelService:
                 "duration": df["duration"].astype(float),
                 "pps": df["pps"].astype(float),
                 "bps": df["bps"].astype(float),
+                "pps_delta": df["pps_delta"].astype(float),
+                "bps_delta": df["bps_delta"].astype(float),
             }
         )
 
@@ -385,7 +401,7 @@ class ModelService:
             except Exception as exc:  # noqa: BLE001
                 LOGGER.warning("LightGBM prediction failed: %s", exc)
         gbm_contrib = gbm_score if gbm_score is not None else 0.5
-        hybrid_score = float(iso_score + ae_score + gbm_contrib)/3
+        hybrid_score = float((iso_score + ae_score + gbm_contrib) / 3.0)
         is_anom = hybrid_score >= self.threshold
         record_id = self._persist_score(
             ts=ts,
@@ -403,7 +419,7 @@ class ModelService:
             "iso_score": iso_score,
             "ae_score": ae_score,
             "hybrid_score": hybrid_score,
-            "gbm_score": gbm_score,
+            "gbm_score": gbm_score
         }
 
     # ---------------------------------------------------
@@ -422,6 +438,7 @@ class ModelService:
         if not all(path.exists() for path in required):
             LOGGER.info("Model artifacts not found. Running in dummy mode until training is executed.")
             self.model_loaded = False
+            self.prev_flow_stats.clear()
             return
 
         # 저장된 인코더/스케일러/모델 파라미터를 전부 메모리로 적재한다.
@@ -458,6 +475,7 @@ class ModelService:
         else:
             self.gbm_model = None
 
+        self.prev_flow_stats.clear()
         self.model_loaded = all([self.iso_model, self.autoencoder, self.gbm_model])
 
     def _safe_label_encode(self, encoder: LabelEncoder, value: str) -> int:
@@ -467,6 +485,34 @@ class ModelService:
         # 미리 학습된 클래스에만 존재하는 값을 안전하게 숫자로 변환한다.
         return int(encoder.transform([value])[0])
 
+    def _flow_key(self, flow: FlowFeatures) -> Tuple[str, str, int, int, str]:
+        return (
+            str(flow.src_ip),
+            str(flow.dst_ip),
+            int(flow.src_port),
+            int(flow.dst_port),
+            str(flow.proto).upper(),
+        )
+
+    def _resolve_flow_deltas(self, flow: FlowFeatures, current_pps: float, current_bps: float) -> Tuple[float, float]:
+        key = self._flow_key(flow)
+        prev_pps, prev_bps = self.prev_flow_stats.get(key, (current_pps, current_bps))
+        delta_pps = float(current_pps - prev_pps)
+        delta_bps = float(current_bps - prev_bps)
+        if flow.pps_delta is not None:
+            try:
+                delta_pps = float(flow.pps_delta)
+            except (TypeError, ValueError):
+                delta_pps = float(current_pps - prev_pps)
+        if flow.bps_delta is not None:
+            try:
+                delta_bps = float(flow.bps_delta)
+            except (TypeError, ValueError):
+                delta_bps = float(current_bps - prev_bps)
+
+        self.prev_flow_stats[key] = (current_pps, current_bps)
+        return delta_pps, delta_bps
+
     def _transform_flow(self, flow: FlowFeatures) -> np.ndarray:
         if not all([self.enc_src_ip, self.enc_dst_ip, self.enc_proto, self.scaler]):
             raise RuntimeError("Model artifacts are not loaded.")
@@ -475,8 +521,20 @@ class ModelService:
         df["src_ip"] = df["src_ip"].astype(str)
         df["dst_ip"] = df["dst_ip"].astype(str)
         df["proto"] = df["proto"].astype(str).str.upper()
-        df["pps"] = np.log1p(df["pps"].astype(float))
-        df["bps"] = np.log1p(df["bps"].astype(float))
+        df["src_port"] = df["src_port"].astype(int)
+        df["dst_port"] = df["dst_port"].astype(int)
+        df["packet_count"] = df["packet_count"].astype(int)
+        df["byte_count"] = df["byte_count"].astype(int)
+        df["duration"] = df["duration"].astype(float)
+        df["pps"] = df["pps"].astype(float)
+        df["bps"] = df["bps"].astype(float)
+
+        pps_delta, bps_delta = self._resolve_flow_deltas(flow, float(df.at[0, "pps"]), float(df.at[0, "bps"]))
+        df.loc[:, "pps_delta"] = pps_delta
+        df.loc[:, "bps_delta"] = bps_delta
+
+        df["pps"] = np.log1p(df["pps"])
+        df["bps"] = np.log1p(df["bps"])
 
         df["src_ip"] = [self._safe_label_encode(self.enc_src_ip, ip) for ip in df["src_ip"]]
         df["dst_ip"] = [self._safe_label_encode(self.enc_dst_ip, ip) for ip in df["dst_ip"]]
@@ -545,8 +603,30 @@ class ModelService:
                 if self.gbm_model is not None
                 else 0.5
             )
-            scores.append(float(iso_score + ae_score + gbm_score)/3)
+            scores.append(float((iso_score + ae_score + gbm_score) / 3.0))
         return scores
+
+    def _inject_rate_deltas(self, df: pd.DataFrame) -> pd.DataFrame:
+        working = df.copy()
+        working["_orig_idx"] = np.arange(len(working))
+        working["_ts"] = pd.to_datetime(working.get("start_time"), errors="coerce")
+        sort_cols = [
+            "src_ip",
+            "dst_ip",
+            "src_port",
+            "dst_port",
+            "proto",
+            "_ts",
+            "_orig_idx",
+        ]
+        working = working.sort_values(sort_cols)
+        group_cols = ["src_ip", "dst_ip", "src_port", "dst_port", "proto"]
+        working["pps_delta"] = working.groupby(group_cols)["pps"].diff().fillna(0.0)
+        working["bps_delta"] = working.groupby(group_cols)["bps"].diff().fillna(0.0)
+        working = working.sort_values("_orig_idx").drop(columns=["_orig_idx", "_ts"])
+        working["pps_delta"] = working["pps_delta"].replace([np.inf, -np.inf], 0.0).fillna(0.0)
+        working["bps_delta"] = working["bps_delta"].replace([np.inf, -np.inf], 0.0).fillna(0.0)
+        return working
 
     def _persist_score(
         self,

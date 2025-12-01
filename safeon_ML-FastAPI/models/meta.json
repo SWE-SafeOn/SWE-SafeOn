@@ -9,10 +9,12 @@
     "byte_count",
     "duration",
     "pps",
-    "bps"
+    "bps",
+    "pps_delta",
+    "bps_delta"
   ],
-  "threshold": 0.42270050264735953,
+  "threshold": 0.45744844619409364,
   "ae_type": "feedforward",
-  "iso_decision_min": -0.10528933489243841,
-  "iso_decision_max": 0.2003099025554212
+  "iso_decision_min": -0.11517880798648583,
+  "iso_decision_max": 0.22443635782949628
 }

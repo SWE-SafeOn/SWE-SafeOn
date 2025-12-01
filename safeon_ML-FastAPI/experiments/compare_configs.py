@@ -19,7 +19,7 @@ CONFIGS = [
 def evaluate(service: ModelService, val_df: pd.DataFrame) -> float:
     preds = []
     for _, row in val_df.iterrows():
-        flow = FlowFeatures(**row[service.feature_columns].to_dict())
+        flow = FlowFeatures(**row[service.base_feature_columns].to_dict())
         result = service.predict(flow)
         preds.append((result["is_anom"], row["label"] != 0))
     tp = sum(p and t for p, t in preds)
@@ -34,6 +34,7 @@ def evaluate(service: ModelService, val_df: pd.DataFrame) -> float:
 def main() -> None:
     df = pd.read_csv(DATASET)
     df["proto"] = df["proto"].astype(str).str.upper()
+    df = df.sort_values("start_time")
     split = int(len(df) * (1 - VAL_RATIO))
     train_df = df.iloc[:split]
     val_df = df.iloc[split:]
