@@ -12,7 +12,7 @@ VAL_RATIO = 0.2
 TMP_TRAIN = Path("/tmp/safeon_train_subset.csv")
 
 CONFIGS = [
-    {"name": "1번", "contamination": 0.05, "epochs": 16, "batch": 32},
+    {"name": "1번", "contamination": 0.05, "epochs": 20, "batch": 32},
 ]
 
 
