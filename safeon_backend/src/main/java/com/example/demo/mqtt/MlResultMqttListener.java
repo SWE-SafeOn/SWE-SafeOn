@@ -91,7 +91,7 @@ public class MlResultMqttListener implements MqttPacketListener {
                 .packetMeta(payload.packetMetaId())
                 .isoScore(payload.isoScore())
                 .aeScore(payload.aeScore())
-                .gbmScore(payload.gbmScore())
+                .rfScore(payload.rfScore())
                 .hybridScore(payload.hybridScore())
                 .isAnom(Boolean.TRUE.equals(payload.isAnom()))
                 .build();
@@ -193,7 +193,7 @@ public class MlResultMqttListener implements MqttPacketListener {
             @JsonAlias({"device_id", "deviceId"}) UUID deviceId,
             @JsonAlias({"iso_score", "isoScore"}) Double isoScore,
             @JsonAlias({"ae_score", "aeScore"}) Double aeScore,
-            @JsonAlias({"gbm_score", "gbmScore"}) Double gbmScore,
+            @JsonAlias({"rf_score", "rfScore"}) Double rfScore,
             @JsonAlias({"hybrid_score", "hybridScore"}) Double hybridScore,
             @JsonAlias({"is_anom", "isAnom"}) Boolean isAnom,
             @JsonAlias({"severity"}) String severity,

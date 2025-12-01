@@ -23,6 +23,12 @@ def parse_args() -> argparse.Namespace:
         help="Path to CSV dataset (defaults to DATASET_PATH env or datasets/esp32-cam/dataset.csv).",
     )
     parser.add_argument(
+        "--attacker-dataset",
+        type=Path,
+        default=None,
+        help="Optional attacker dataset CSV to label as attacks (defaults to ATTACKER_DATASET_PATH env).",
+    )
+    parser.add_argument(
         "--epochs",
         type=int,
         default=int(os.getenv("EPOCHS", "28")),
@@ -42,7 +48,12 @@ def main() -> None:
     args = parse_args()
     # ModelService가 전처리/학습/아티팩트 저장을 모두 관리한다.
     service = ModelService.from_env()
-    result = service.train(dataset_path=args.dataset, epochs=args.epochs, batch_size=args.batch_size)
+    result = service.train(
+        dataset_path=args.dataset,
+        attacker_dataset_path=args.attacker_dataset,
+        epochs=args.epochs,
+        batch_size=args.batch_size,
+    )
     print("Training complete.")
     print(f"Artifacts saved to: {result['model_dir']}")
     print(f"Dataset used: {result['dataset']}")

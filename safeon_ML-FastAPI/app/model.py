@@ -1,10 +1,11 @@
 import json
 import logging
 import os
+from collections import deque
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Deque, Dict, List, Optional, Tuple
 from uuid import UUID, uuid4
 
 import joblib
@@ -13,8 +14,7 @@ import pandas as pd
 import torch
 import torch.nn as nn
 from pydantic import BaseModel, validator
-from sklearn.ensemble import IsolationForest
-from lightgbm import LGBMClassifier
+from sklearn.ensemble import IsolationForest, RandomForestClassifier
 from sklearn.preprocessing import LabelEncoder, MinMaxScaler
 from sqlalchemy import create_engine, text
 from torch.utils.data import DataLoader, TensorDataset
@@ -33,6 +33,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 APP_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_MODEL_DIR = APP_ROOT / "models"
 DEFAULT_DATASET = PROJECT_ROOT / "datasets" / "esp32-cam" / "dataset.csv"
+DEFAULT_ATTACKER_DATASET = PROJECT_ROOT / "datasets" / "esp32-cam" / "attacker.csv"
 DEFAULT_DB_URL = os.getenv(
     "DATABASE_URL", "postgresql://safeon:0987@localhost:5432/safeon"
 )
@@ -41,26 +42,39 @@ DEFAULT_DB_URL = os.getenv(
 # ---------------------------------------------------
 # Models and schema
 # ---------------------------------------------------
-class FeedForwardAE(nn.Module):
-    """Fully-connected autoencoder for single flow reconstruction."""
-
-    def __init__(self, num_features: int, hidden_dim: int = 64, bottleneck: int = 16):
+class LstmAE(nn.Module):
+    def __init__(
+        self,
+        num_features: int,
+        seq_len: int,
+        hidden_dim: int = 64,
+        latent_dim: int = 32,
+        num_layers: int = 1,
+    ):
         super().__init__()
-        self.encoder = nn.Sequential(
-            nn.Linear(num_features, hidden_dim),
-            nn.ReLU(),
-            nn.Linear(hidden_dim, bottleneck),
-            nn.ReLU(),
+        self.seq_len = seq_len
+        self.encoder = nn.LSTM(
+            input_size=num_features,
+            hidden_size=hidden_dim,
+            num_layers=num_layers,
+            batch_first=True,
         )
-        self.decoder = nn.Sequential(
-            nn.Linear(bottleneck, hidden_dim),
-            nn.ReLU(),
-            nn.Linear(hidden_dim, num_features),
+        self.enc_to_latent = nn.Linear(hidden_dim, latent_dim)
+        self.latent_to_hidden = nn.Linear(latent_dim, hidden_dim)
+        self.decoder = nn.LSTM(
+            input_size=hidden_dim,
+            hidden_size=hidden_dim,
+            num_layers=num_layers,
+            batch_first=True,
         )
+        self.output_layer = nn.Linear(hidden_dim, num_features)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        encoded = self.encoder(x)
-        return self.decoder(encoded)
+        _, (hidden, _) = self.encoder(x)
+        latent = torch.tanh(self.enc_to_latent(hidden[-1]))
+        decoder_input = torch.tanh(self.latent_to_hidden(latent)).unsqueeze(1).repeat(1, self.seq_len, 1)
+        decoded, _ = self.decoder(decoder_input)
+        return self.output_layer(decoded)
 
 
 class FlowFeatures(BaseModel):
@@ -80,6 +94,8 @@ class FlowFeatures(BaseModel):
     end_time: Optional[float] = None
     pps_delta: Optional[float] = None
     bps_delta: Optional[float] = None
+    pps_cum_increase: Optional[float] = None
+    bps_cum_increase: Optional[float] = None
 
     @validator("start_time", "end_time", pre=True)
     def parse_timestamp(cls, v) -> Optional[float]:  # noqa: D417
@@ -131,6 +147,8 @@ class FlowFeatures(BaseModel):
             "bps": self.bps,
             "pps_delta": 0.0 if self.pps_delta is None else self.pps_delta,
             "bps_delta": 0.0 if self.bps_delta is None else self.bps_delta,
+            "pps_cum_increase": 0.0 if self.pps_cum_increase is None else self.pps_cum_increase,
+            "bps_cum_increase": 0.0 if self.bps_cum_increase is None else self.bps_cum_increase,
         }
         return pd.DataFrame([data])[feature_order]
 
@@ -144,7 +162,7 @@ class ArtifactPaths:
     isolation_forest: Path
     autoencoder: Path
     meta: Path
-    lgbm: Path
+    rf_model: Path
 
 
 # ---------------------------------------------------
@@ -165,22 +183,31 @@ class ModelService:
         "pps",
         "bps",
     ]
-    feature_columns = base_feature_columns + ["pps_delta", "bps_delta"]
+    feature_columns = base_feature_columns + [
+        "pps_delta",
+        "bps_delta",
+        "pps_cum_increase",
+        "bps_cum_increase",
+    ]
     # delta 특성을 포함해 정적 값 + 변화량을 동시에 학습한다.
 
     def __init__(
         self,
         model_dir: Path = DEFAULT_MODEL_DIR,
         dataset_path: Path = DEFAULT_DATASET,
+        attacker_dataset_path: Optional[Path] = DEFAULT_ATTACKER_DATASET,
         database_url: Optional[str] = DEFAULT_DB_URL,
         allow_dummy: bool = True,
         threshold: float = 0.35,
+        seq_len: int = 20,
     ) -> None:
         self.model_dir = Path(model_dir)
         self.dataset_path = Path(dataset_path)
+        self.attacker_dataset_path = Path(attacker_dataset_path) if attacker_dataset_path else None
         self.database_url = database_url
         self.allow_dummy = allow_dummy
         self.threshold = threshold
+        self.seq_len = seq_len
         self.num_features = len(self.feature_columns)
 
         self.device = torch.device(
@@ -198,7 +225,7 @@ class ModelService:
             isolation_forest=self.model_dir / "isolation_forest.pkl",
             autoencoder=self.model_dir / "autoencoder.pth",
             meta=self.model_dir / "meta.json",
-            lgbm=self.model_dir / "lgbm.pkl",
+            rf_model=self.model_dir / "rf_model.pkl",
         )
 
         self.enc_src_ip: Optional[LabelEncoder] = None
@@ -206,13 +233,14 @@ class ModelService:
         self.enc_proto: Optional[LabelEncoder] = None
         self.scaler: Optional[MinMaxScaler] = None
         self.iso_model: Optional[IsolationForest] = None
-        self.autoencoder: Optional[FeedForwardAE] = None
-        self.gbm_model: Optional[LGBMClassifier] = None
+        self.autoencoder: Optional[LstmAE] = None
+        self.rf_model: Optional[RandomForestClassifier] = None
         self.iso_decision_min: float = 0.0
         self.iso_decision_max: float = 1.0
         self.engine = create_engine(self.database_url) if self.database_url else None
         self.model_loaded = False
-        self.prev_flow_stats: Dict[Tuple[str, str, int, int, str], Tuple[float, float]] = {}
+        self.prev_flow_stats: Dict[str, Tuple[float, float, float, float]] = {}
+        self.sequence_buffers: Dict[str, Deque[np.ndarray]] = {}
         # 최근 플로우의 pps/bps를 기억해 추론 시 delta를 보정한다.
 
         os.makedirs(self.model_dir, exist_ok=True)
@@ -225,34 +253,66 @@ class ModelService:
     def from_env(cls) -> "ModelService":
         allow_dummy = os.getenv("ALLOW_DUMMY", "true").lower() != "false"
         threshold = float(os.getenv("ANOMALY_THRESHOLD", "0.35"))
+        seq_len = int(os.getenv("SEQ_LEN", "20"))
 
         model_dir = Path(os.getenv("MODEL_DIR", DEFAULT_MODEL_DIR))
         dataset_path = Path(os.getenv("DATASET_PATH", DEFAULT_DATASET))
         database_url = os.getenv("DATABASE_URL", DEFAULT_DB_URL)
+        attacker_dataset_path = os.getenv("ATTACKER_DATASET_PATH", str(DEFAULT_ATTACKER_DATASET))
 
         return cls(
             model_dir=model_dir,
             dataset_path=dataset_path,
+            attacker_dataset_path=Path(attacker_dataset_path) if attacker_dataset_path else None,
             database_url=database_url,
             allow_dummy=allow_dummy,
             threshold=threshold,
+            seq_len=seq_len,
         )
 
     # ---------------------------------------------------
     # Training
     # ---------------------------------------------------
-    def train(self, dataset_path: Optional[Path] = None, epochs: int = 28, batch_size: int = 32) -> Dict[str, str]:
+    def train(
+        self,
+        dataset_path: Optional[Path] = None,
+        attacker_dataset_path: Optional[Path] = None,
+        epochs: int = 28,
+        batch_size: int = 32,
+    ) -> Dict[str, str]:
         path = Path(dataset_path or self.dataset_path)
         if not path.exists():
             raise FileNotFoundError(f"Dataset not found at {path}")
 
         LOGGER.info("Loading dataset from %s", path)
         df = pd.read_csv(path)
+        attacker_path = attacker_dataset_path or self.attacker_dataset_path
+        if attacker_path:
+            attacker_path = Path(attacker_path)
+            if attacker_path.exists():
+                LOGGER.info("Loading attacker dataset from %s", attacker_path)
+                attacker_df = pd.read_csv(attacker_path)
+                required_attack_cols = [
+                    c for c in self.base_feature_columns + ["start_time", "end_time"] if c not in attacker_df.columns
+                ]
+                if required_attack_cols:
+                    raise ValueError(
+                        "Attacker dataset missing required columns: "
+                        + ", ".join(required_attack_cols)
+                    )
+                attacker_df = attacker_df.copy()
+                attacker_df["label"] = 1
+                df = pd.concat([df, attacker_df], ignore_index=True)
+            else:
+                LOGGER.warning("Attacker dataset path %s does not exist. Skipping attacker samples.", attacker_path)
+
         missing = [c for c in self.base_feature_columns + ["label"] if c not in df.columns]
         if missing:
             raise ValueError(f"Dataset is missing required columns: {', '.join(missing)}")
 
         df = df.dropna(subset=self.base_feature_columns + ["label"]).copy()
+        df["start_time"] = pd.to_datetime(df["start_time"], errors="coerce")
+        df = df.sort_values("start_time").reset_index(drop=True)
         df["proto"] = df["proto"].astype(str).str.upper()
         df["src_port"] = df["src_port"].astype(int)
         df["dst_port"] = df["dst_port"].astype(int)
@@ -261,6 +321,18 @@ class ModelService:
         df["duration"] = df["duration"].astype(float)
         df["pps"] = df["pps"].astype(float)
         df["bps"] = df["bps"].astype(float)
+        df["label"] = df["label"].astype(int)
+        df["flow_key"] = (
+            df["src_ip"].astype(str)
+            + "|"
+            + df["dst_ip"].astype(str)
+            + "|"
+            + df["src_port"].astype(str)
+            + "|"
+            + df["dst_port"].astype(str)
+            + "|"
+            + df["proto"].astype(str)
+        )
         # 시계열 순서에 맞춰 플로우별 변화량 컬럼을 추가한다.
         df = self._inject_rate_deltas(df)
         df["pps"] = np.log1p(df["pps"])
@@ -285,8 +357,13 @@ class ModelService:
                 "bps": df["bps"].astype(float),
                 "pps_delta": df["pps_delta"].astype(float),
                 "bps_delta": df["bps_delta"].astype(float),
+                "pps_cum_increase": df["pps_cum_increase"].astype(float),
+                "bps_cum_increase": df["bps_cum_increase"].astype(float),
             }
         )
+        encoded["flow_key"] = df["flow_key"].values
+        encoded["start_time"] = df["start_time"].values
+        encoded["label"] = df["label"].values
 
         normal_mask = df["label"].astype(int) == 0
         if not normal_mask.any():
@@ -295,9 +372,9 @@ class ModelService:
         self.scaler = MinMaxScaler()
         normal_encoded = encoded.loc[normal_mask, self.feature_columns]
         scaled_normal = self.scaler.fit_transform(normal_encoded)
-        labels_normal = df.loc[normal_mask, "label"].astype(int).to_numpy()
         scaled_all = self.scaler.transform(encoded[self.feature_columns])
-        labels_all = df["label"].astype(int).to_numpy()
+        labels_all = encoded["label"].astype(int).to_numpy()
+        encoded.loc[:, self.feature_columns] = scaled_all
 
         joblib.dump(self.enc_src_ip, self.paths.enc_src_ip)
         joblib.dump(self.enc_dst_ip, self.paths.enc_dst_ip)
@@ -315,22 +392,22 @@ class ModelService:
         if self.iso_decision_max - self.iso_decision_min <= 1e-9:
             self.iso_decision_max = self.iso_decision_min + 1e-6
 
-        tensor_normal = torch.tensor(scaled_normal, dtype=torch.float32)
-        dataset = DataLoader(
-            tensor_normal,
-            batch_size=batch_size,
-            shuffle=True,
-        )
+        normal_sequences = self._build_sequences_from_df(encoded, require_all_normal=True)
+        if normal_sequences.size == 0:
+            raise ValueError("Not enough normal sequences to train the LSTM autoencoder.")
+        sequence_tensor = torch.tensor(normal_sequences, dtype=torch.float32)
+        sequence_dataset = TensorDataset(sequence_tensor)
+        dataset = DataLoader(sequence_dataset, batch_size=batch_size, shuffle=True)
 
-        LOGGER.info("Training FeedForward Autoencoder on %s using %s samples", self.device, tensor_normal.shape)
-        self.autoencoder = FeedForwardAE(num_features=scaled_normal.shape[1]).to(self.device)
+        LOGGER.info("Training LSTM Autoencoder on %s using %s sequences", self.device, sequence_tensor.shape)
+        self.autoencoder = LstmAE(num_features=self.num_features, seq_len=self.seq_len).to(self.device)
         optimizer = torch.optim.Adam(self.autoencoder.parameters(), lr=1e-3)
         criterion = nn.MSELoss()
 
         for epoch in range(1, epochs + 1):
             self.autoencoder.train()
             epoch_loss = 0.0
-            for batch_x in dataset:
+            for batch_x, in dataset:
                 batch_x = batch_x.to(self.device)
                 optimizer.zero_grad()
                 recon = self.autoencoder(batch_x)
@@ -343,24 +420,29 @@ class ModelService:
         self.autoencoder.eval()
         torch.save(self.autoencoder.state_dict(), self.paths.autoencoder)
 
-        LOGGER.info("Training LightGBM classifier on labeled data")
-        self.gbm_model = LGBMClassifier(
+        LOGGER.info("Training RandomForest classifier on labeled data")
+        self.rf_model = RandomForestClassifier(
             n_estimators=500,
-            learning_rate=0.05,
-            max_depth=-1,
-            subsample=0.8,
-            colsample_bytree=0.8,
+            max_depth=None,
+            max_features="sqrt",
+            min_samples_leaf=1,
             random_state=42,
             class_weight="balanced",
         )
-        self.gbm_model.fit(scaled_all, labels_all)
-        joblib.dump(self.gbm_model, self.paths.lgbm)
+        unique_labels = np.unique(labels_all)
+        if unique_labels.size >= 2:
+            self.rf_model.fit(scaled_all, labels_all)
+            joblib.dump(self.rf_model, self.paths.rf_model)
+        else:
+            LOGGER.warning("Skipping RandomForest training (only one label present: %s)", unique_labels.tolist())
+            self.rf_model = None
 
-        self.threshold = self._calculate_threshold(scaled_all, labels_all)
+        self.threshold = self._calculate_threshold(encoded)
         meta = {
             "feature_columns": self.feature_columns,
             "threshold": self.threshold,
-            "ae_type": "feedforward",
+            "ae_type": "lstm",
+            "seq_len": self.seq_len,
             "iso_decision_min": self.iso_decision_min,
             "iso_decision_max": self.iso_decision_max,
         }
@@ -393,26 +475,28 @@ class ModelService:
             return self._dummy_result(ts)
 
         scaled_vec = self._transform_flow(flow)
+        flow_key = self._flow_key(flow)
+        sequence = self._append_sequence(flow_key, scaled_vec)
 
-        # IsolationForest와 AE 점수를 혼합해 최종 이상 점수를 만든다.
+        # IsolationForest와 LSTM AE + RandomForest 점수를 혼합해 최종 hybrid 이상 점수를 만든다.
         iso_score = self._iso_score(scaled_vec)
-        ae_score = float(self._ae_score(scaled_vec) or 0.0)
-        gbm_score = None
-        if self.gbm_model is not None:
+        ae_score = float(self._ae_score(sequence) or 0.0)
+        rf_score = None
+        if self.rf_model is not None:
             try:
-                gbm_score = float(self.gbm_model.predict_proba([scaled_vec])[0][1])
+                rf_score = float(self.rf_model.predict_proba([scaled_vec])[0][1])
             except Exception as exc:  # noqa: BLE001
-                LOGGER.warning("LightGBM prediction failed: %s", exc)
-        gbm_contrib = gbm_score if gbm_score is not None else 0.5
-        gbm_contrib = float(max(0.0, min(1.0, gbm_contrib)))
-        gbm_score = gbm_contrib if gbm_score is not None else None
-        hybrid_score = float((iso_score + ae_score + gbm_contrib) / 3.0)
+                LOGGER.warning("RandomForest prediction failed: %s", exc)
+        rf_contrib = rf_score if rf_score is not None else 0.5
+        rf_contrib = float(max(0.0, min(1.0, rf_contrib)))
+        rf_score = rf_contrib if rf_score is not None else None
+        hybrid_score = float((iso_score + ae_score + rf_contrib) / 3.0)
         is_anom = hybrid_score >= self.threshold
         record_id = self._persist_score(
             ts=ts,
             iso_score=iso_score,
             ae_score=ae_score,
-            gbm_score=gbm_score,
+            rf_score=rf_score,
             hybrid_score=hybrid_score,
             is_anom=is_anom,
             user_id=user_id,
@@ -424,7 +508,7 @@ class ModelService:
             "iso_score": iso_score,
             "ae_score": ae_score,
             "hybrid_score": hybrid_score,
-            "gbm_score": gbm_score
+            "rf_score": rf_score
         }
 
     # ---------------------------------------------------
@@ -454,34 +538,38 @@ class ModelService:
         self.scaler = joblib.load(self.paths.scaler)
         self.iso_model = joblib.load(self.paths.isolation_forest)
 
+        seq_len = self.seq_len
         if self.paths.meta.exists():
             try:
                 meta = json.loads(self.paths.meta.read_text())
                 self.threshold = float(meta.get("threshold", self.threshold))
                 self.iso_decision_min = float(meta.get("iso_decision_min", self.iso_decision_min))
                 self.iso_decision_max = float(meta.get("iso_decision_max", self.iso_decision_max))
+                seq_len = int(meta.get("seq_len", seq_len))
             except Exception as exc:  # noqa: BLE001
                 LOGGER.warning("Failed to parse meta.json: %s", exc)
+        self.seq_len = seq_len
 
-        self.autoencoder = FeedForwardAE(num_features=self.num_features).to(self.device)
+        self.autoencoder = LstmAE(num_features=self.num_features, seq_len=self.seq_len).to(self.device)
         try:
             state_dict = torch.load(self.paths.autoencoder, map_location=self.device)
             self.autoencoder.load_state_dict(state_dict)
             self.autoencoder.eval()
         except Exception as exc:  # noqa: BLE001
-            LOGGER.warning("Failed to load feedforward AE weights. Retrain required: %s", exc)
+            LOGGER.warning("Failed to load LSTM AE weights. Retrain required: %s", exc)
             self.autoencoder = None
-        if self.paths.lgbm.exists():
+        if self.paths.rf_model.exists():
             try:
-                self.gbm_model = joblib.load(self.paths.lgbm)
+                self.rf_model = joblib.load(self.paths.rf_model)
             except Exception as exc:  # noqa: BLE001
-                LOGGER.warning("Failed to load LightGBM weights: %s", exc)
-                self.gbm_model = None
+                LOGGER.warning("Failed to load RandomForest weights: %s", exc)
+                self.rf_model = None
         else:
-            self.gbm_model = None
+            self.rf_model = None
 
         self.prev_flow_stats.clear()
-        self.model_loaded = all([self.iso_model, self.autoencoder, self.gbm_model])
+        self.sequence_buffers.clear()
+        self.model_loaded = all([self.iso_model, self.autoencoder, self.rf_model])
 
     def _safe_label_encode(self, encoder: LabelEncoder, value: str) -> int:
         classes = set(encoder.classes_.tolist())
@@ -490,19 +578,41 @@ class ModelService:
         # 미리 학습된 클래스에만 존재하는 값을 안전하게 숫자로 변환한다.
         return int(encoder.transform([value])[0])
 
-    def _flow_key(self, flow: FlowFeatures) -> Tuple[str, str, int, int, str]:
-        return (
-            str(flow.src_ip),
-            str(flow.dst_ip),
-            int(flow.src_port),
-            int(flow.dst_port),
-            str(flow.proto).upper(),
+    def _flow_key(self, flow: FlowFeatures) -> str:
+        return "|".join(
+            [
+                str(flow.src_ip),
+                str(flow.dst_ip),
+                str(flow.src_port),
+                str(flow.dst_port),
+                str(flow.proto).upper(),
+            ]
         )
 
-    def _resolve_flow_deltas(self, flow: FlowFeatures, current_pps: float, current_bps: float) -> Tuple[float, float]:
+    def _append_sequence(
+        self,
+        key: str,
+        vec: np.ndarray,
+        buffers: Optional[Dict[str, Deque[np.ndarray]]] = None,
+    ) -> Optional[np.ndarray]:
+        target = buffers if buffers is not None else self.sequence_buffers
+        seq = target.get(key)
+        if seq is None:
+            seq = deque(maxlen=self.seq_len)
+            target[key] = seq
+        seq.append(vec)
+        if len(seq) == self.seq_len:
+            return np.stack(seq, axis=0)
+        return None
+
+    def _resolve_flow_deltas(
+        self, flow: FlowFeatures, current_pps: float, current_bps: float
+    ) -> Tuple[float, float, float, float]:
         # MQTT/REST 입력에 delta가 없으면 최근 관측값 기준으로 계산한다.
         key = self._flow_key(flow)
-        prev_pps, prev_bps = self.prev_flow_stats.get(key, (current_pps, current_bps))
+        prev_pps, prev_bps, prev_pps_cum, prev_bps_cum = self.prev_flow_stats.get(
+            key, (current_pps, current_bps, 0.0, 0.0)
+        )
         delta_pps = float(current_pps - prev_pps)
         delta_bps = float(current_bps - prev_bps)
         if flow.pps_delta is not None:
@@ -516,8 +626,21 @@ class ModelService:
             except (TypeError, ValueError):
                 delta_bps = float(current_bps - prev_bps)
 
-        self.prev_flow_stats[key] = (current_pps, current_bps)
-        return delta_pps, delta_bps
+        pps_cum = prev_pps_cum + max(0.0, delta_pps)
+        bps_cum = prev_bps_cum + max(0.0, delta_bps)
+        if flow.pps_cum_increase is not None:
+            try:
+                pps_cum = float(flow.pps_cum_increase)
+            except (TypeError, ValueError):
+                pass
+        if flow.bps_cum_increase is not None:
+            try:
+                bps_cum = float(flow.bps_cum_increase)
+            except (TypeError, ValueError):
+                pass
+
+        self.prev_flow_stats[key] = (current_pps, current_bps, pps_cum, bps_cum)
+        return delta_pps, delta_bps, pps_cum, bps_cum
 
     def _transform_flow(self, flow: FlowFeatures) -> np.ndarray:
         if not all([self.enc_src_ip, self.enc_dst_ip, self.enc_proto, self.scaler]):
@@ -536,9 +659,16 @@ class ModelService:
         df["bps"] = df["bps"].astype(float)
 
         # 추론 시점의 delta 값을 보정해 정규화 파이프라인에 맞춘다.
-        pps_delta, bps_delta = self._resolve_flow_deltas(flow, float(df.at[0, "pps"]), float(df.at[0, "bps"]))
+        (
+            pps_delta,
+            bps_delta,
+            pps_cum_increase,
+            bps_cum_increase,
+        ) = self._resolve_flow_deltas(flow, float(df.at[0, "pps"]), float(df.at[0, "bps"]))
         df.loc[:, "pps_delta"] = pps_delta
         df.loc[:, "bps_delta"] = bps_delta
+        df.loc[:, "pps_cum_increase"] = pps_cum_increase
+        df.loc[:, "bps_cum_increase"] = bps_cum_increase
 
         df["pps"] = np.log1p(df["pps"])
         df["bps"] = np.log1p(df["bps"])
@@ -550,11 +680,11 @@ class ModelService:
         scaled = self.scaler.transform(df[self.feature_columns])
         return scaled[0]
 
-    def _ae_score(self, scaled_vec: np.ndarray) -> Optional[float]:
-        if self.autoencoder is None:
+    def _ae_score(self, sequence: Optional[np.ndarray]) -> Optional[float]:
+        if self.autoencoder is None or sequence is None or len(sequence) < self.seq_len:
             return None
 
-        tensor = torch.tensor(scaled_vec.reshape(1, -1), dtype=torch.float32).to(self.device)
+        tensor = torch.tensor(sequence.reshape(1, self.seq_len, -1), dtype=torch.float32).to(self.device)
 
         with torch.no_grad():
             recon = self.autoencoder(tensor)
@@ -572,11 +702,11 @@ class ModelService:
         score = (self.iso_decision_max - raw) / span
         return float(max(0.0, min(1.0, score)))
 
-    def _calculate_threshold(self, scaled: np.ndarray, labels: np.ndarray) -> float:
+    def _calculate_threshold(self, df: pd.DataFrame) -> float:
         if self.iso_model is None:
             return self.threshold
 
-        hybrid_scores = self._compute_hybrid_scores(scaled)
+        hybrid_scores, labels = self._compute_hybrid_scores(df)
         normal_scores = [score for score, label in zip(hybrid_scores, labels) if label == 0]
         if not normal_scores:
             LOGGER.warning(
@@ -595,19 +725,44 @@ class ModelService:
         )
         return threshold
 
-    def _compute_hybrid_scores(self, scaled: np.ndarray) -> List[float]:
+    def _compute_hybrid_scores(self, df: pd.DataFrame) -> Tuple[List[float], List[int]]:
         scores: List[float] = []
-        for vec in scaled:
+        labels: List[int] = []
+        buffers: Dict[str, Deque[np.ndarray]] = {}
+        df_sorted = df.sort_values("start_time")
+        for _, row in df_sorted.iterrows():
+            vec = row[self.feature_columns].to_numpy(dtype=float)
+            key = row["flow_key"]
+            sequence = self._append_sequence(key, vec, buffers)
             iso_score = self._iso_score(vec)
-            ae_score = self._ae_score(vec) or 0.0
-            gbm_score = (
-                float(self.gbm_model.predict_proba([vec])[0][1])
-                if self.gbm_model is not None
+            ae_score = self._ae_score(sequence) or 0.0
+            rf_score = (
+                float(self.rf_model.predict_proba([vec])[0][1])
+                if self.rf_model is not None
                 else 0.5
             )
-            gbm_score = float(max(0.0, min(1.0, gbm_score)))
-            scores.append(float((iso_score + ae_score + gbm_score) / 3.0))
-        return scores
+            rf_score = float(max(0.0, min(1.0, rf_score)))
+            scores.append(float((iso_score + ae_score + rf_score) / 3.0))
+            labels.append(int(row["label"]))
+        return scores, labels
+
+    def _build_sequences_from_df(
+        self, df: pd.DataFrame, require_all_normal: bool = False
+    ) -> np.ndarray:
+        sequences: List[np.ndarray] = []
+        for _, group in df.sort_values("start_time").groupby("flow_key"):
+            values = group[self.feature_columns].to_numpy()
+            labels = group["label"].to_numpy()
+            if len(values) < self.seq_len:
+                continue
+            for start in range(0, len(values) - self.seq_len + 1):
+                end = start + self.seq_len
+                if require_all_normal and not np.all(labels[start:end] == 0):
+                    continue
+                sequences.append(values[start:end])
+        if not sequences:
+            return np.empty((0, self.seq_len, self.num_features), dtype=np.float32)
+        return np.asarray(sequences, dtype=np.float32)
 
     def _inject_rate_deltas(self, df: pd.DataFrame) -> pd.DataFrame:
         working = df.copy()
@@ -626,9 +781,17 @@ class ModelService:
         group_cols = ["src_ip", "dst_ip", "src_port", "dst_port", "proto"]
         working["pps_delta"] = working.groupby(group_cols)["pps"].diff().fillna(0.0)
         working["bps_delta"] = working.groupby(group_cols)["bps"].diff().fillna(0.0)
+        working["pps_cum_increase"] = working.groupby(group_cols)["pps_delta"].transform(
+            lambda s: s.clip(lower=0.0).cumsum()
+        )
+        working["bps_cum_increase"] = working.groupby(group_cols)["bps_delta"].transform(
+            lambda s: s.clip(lower=0.0).cumsum()
+        )
         working = working.sort_values("_orig_idx").drop(columns=["_orig_idx", "_ts"])
         working["pps_delta"] = working["pps_delta"].replace([np.inf, -np.inf], 0.0).fillna(0.0)
         working["bps_delta"] = working["bps_delta"].replace([np.inf, -np.inf], 0.0).fillna(0.0)
+        working["pps_cum_increase"] = working["pps_cum_increase"].replace([np.inf, -np.inf], 0.0).fillna(0.0)
+        working["bps_cum_increase"] = working["bps_cum_increase"].replace([np.inf, -np.inf], 0.0).fillna(0.0)
         return working
 
     def _persist_score(
@@ -636,7 +799,7 @@ class ModelService:
         ts: datetime,
         iso_score: float,
         ae_score: float,
-        gbm_score: Optional[float],
+        rf_score: Optional[float],
         hybrid_score: float,
         is_anom: bool,
         user_id: Optional[str],
@@ -653,7 +816,7 @@ class ModelService:
             "alert_id": None,
             "iso_score": iso_score,
             "ae_score": ae_score,
-            "gbm_score": gbm_score,
+            "rf_score": rf_score,
             "hybrid_score": hybrid_score,
             "is_anom": is_anom,
         }
@@ -661,9 +824,9 @@ class ModelService:
         query = text(
             """
             INSERT INTO anomaly_scores (
-                score_id, ts, packet_meta_id, alert_id, iso_score, ae_score, gbm_score, hybrid_score, is_anom
+                score_id, ts, packet_meta_id, alert_id, iso_score, ae_score, rf_score, hybrid_score, is_anom
             )
-            VALUES (:score_id, :ts, :packet_meta_id, :alert_id, :iso_score, :ae_score, :gbm_score, :hybrid_score, :is_anom)
+            VALUES (:score_id, :ts, :packet_meta_id, :alert_id, :iso_score, :ae_score, :rf_score, :hybrid_score, :is_anom)
             """
         )
 
@@ -681,7 +844,7 @@ class ModelService:
             "iso_score": 0.0,
             "ae_score": 0.0,
             "hybrid_score": 0.0,
-            "gbm_score": 0.5,
+            "rf_score": 0.5,
         }
 
     def _coerce_uuid(self, value: Optional[object]) -> Optional[UUID]:
