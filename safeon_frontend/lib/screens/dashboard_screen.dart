@@ -7,6 +7,7 @@ import 'package:intl/intl.dart';
 import '../models/alert.dart';
 import '../models/device.dart';
 import '../models/dashboard_overview.dart';
+import '../models/daily_anomaly_count.dart';
 import '../models/user_profile.dart';
 import '../models/user_session.dart';
 import '../services/safeon_api.dart';
@@ -43,6 +44,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   DashboardOverview? _overview;
   List<SafeOnDevice> _devices = const [];
   List<SafeOnAlert> _alerts = const [];
+  List<DailyAnomalyCount> _dailyAnomalyCounts = const [];
   final Set<String> _knownAlertIds = {};
   final Set<String> _acknowledgingAlertIds = {};
   bool _hasLoadedInitialAlerts = false;
@@ -99,11 +101,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
       final token = widget.session.token;
       final overview = widget.apiClient.fetchDashboardOverview(token);
       final devices = widget.apiClient.fetchDashboardDevices(token);
-      final alerts = widget.apiClient.fetchRecentAlerts(token, limit: 10);
+      final alerts = widget.apiClient.fetchRecentAlerts(token);
+      final anomalies = widget.apiClient.fetchDailyAnomalyCounts(
+        token,
+        startDate: weekStart,
+        endDate: weekStart.add(const Duration(days: 6)),
+      ).catchError((_) => const <DailyAnomalyCount>[]);
       final results = await Future.wait([
         overview,
         devices,
         alerts,
+        anomalies,
       ]);
 
       final fetchedAlerts = results[2] as List<SafeOnAlert>;
@@ -114,6 +122,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         _overview = results[0] as DashboardOverview;
         _devices = results[1] as List<SafeOnDevice>;
         _alerts = fetchedAlerts;
+        _dailyAnomalyCounts = results[3] as List<DailyAnomalyCount>;
         _currentWeekStart = weekStart;
         _knownAlertIds
           ..clear()
@@ -159,7 +168,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     _isPollingAlerts = true;
     try {
       final alerts = await widget.apiClient
-          .fetchRecentAlerts(widget.session.token, limit: 10);
+          .fetchRecentAlerts(widget.session.token);
       if (!mounted) return;
 
       final newAlerts = _computeNewAlerts(alerts);
@@ -173,6 +182,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           await NotificationService.showAlertNotification(alert);
         }
       }
+      await _refreshDailyAnomalyCounts();
     } on ApiException {
       // Polling failures are ignored; the next cycle will retry.
     } catch (_) {
@@ -372,6 +382,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final end = start.add(const Duration(days: 6));
     final countsByDay = List<int>.filled(7, 0);
 
+    if (_dailyAnomalyCounts.isNotEmpty) {
+      for (final item in _dailyAnomalyCounts) {
+        final day = DateTime(item.date.year, item.date.month, item.date.day);
+        if (day.isBefore(start) || day.isAfter(end)) continue;
+        final index = day.difference(start).inDays;
+        if (index >= 0 && index < countsByDay.length) {
+          countsByDay[index] = item.count;
+        }
+      }
+      return countsByDay;
+    }
+
     for (final alert in _alerts) {
       final ts = alert.timestamp;
       if (ts == null) continue;
@@ -387,6 +409,24 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
 
     return countsByDay;
+  }
+
+  Future<void> _refreshDailyAnomalyCounts() async {
+    final weekStart = _startOfWeek(DateTime.now());
+    try {
+      final counts = await widget.apiClient.fetchDailyAnomalyCounts(
+        widget.session.token,
+        startDate: weekStart,
+        endDate: weekStart.add(const Duration(days: 6)),
+      );
+      if (!mounted) return;
+      setState(() {
+        _dailyAnomalyCounts = counts;
+        _currentWeekStart = weekStart;
+      });
+    } on ApiException {
+      // Ignore failures; graph will refresh on the next full reload.
+    } catch (_) {}
   }
 
   @override
