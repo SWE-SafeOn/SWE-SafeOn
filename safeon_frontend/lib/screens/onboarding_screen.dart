@@ -53,7 +53,7 @@ class OnboardingScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 12),
                 Text(
-                  'Intelligent protection for your smart home devices with real-time monitoring and automated response.',
+                  '실시간 모니터링과 자동 대응을 통해 스마트 홈 기기를 지능적으로 보호하세요.',
                   style: theme.textTheme.bodyLarge?.copyWith(
                     color: Colors.white70,
                     fontSize: 18,
@@ -71,7 +71,7 @@ class OnboardingScreen extends StatelessWidget {
                     ),
                   ),
                   child: const Text(
-                    'Get Started',
+                    '시작하기',
                     style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.w600,
