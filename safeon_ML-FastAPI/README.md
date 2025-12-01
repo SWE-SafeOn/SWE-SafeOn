@@ -92,12 +92,12 @@ preprocessing as needed.
    python ../datasets/esp32-cam/combine.py
    ```
 
-   This produces `../datasets/esp32-cam/esp32_win3_dataset.csv`.
+   This produces `../datasets/esp32-cam/dataset.csv`.
 
 2. Train the models:
 
    ```
-   python -m app.train --dataset ../datasets/esp32-cam/esp32_win3_dataset.csv
+   python -m app.train --dataset ../datasets/esp32-cam/dataset.csv
    ```
 
 Artifacts (encoders, scaler, IsolationForest, Transformer autoencoder) are

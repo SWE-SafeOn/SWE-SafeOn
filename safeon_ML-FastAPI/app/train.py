@@ -1,7 +1,7 @@
 """Training entrypoint for the SafeOn anomaly detector.
 
 Run with:
-    python -m app.train --dataset ../datasets/esp32-cam/esp32_win3_dataset.csv
+    python -m app.train --dataset ../datasets/esp32-cam/dataset.csv
 """
 
 import argparse
@@ -20,12 +20,12 @@ def parse_args() -> argparse.Namespace:
         "--dataset",
         type=Path,
         default=None,
-        help="Path to CSV dataset (defaults to DATASET_PATH env or datasets/esp32-cam/esp32_win3_dataset.csv).",
+        help="Path to CSV dataset (defaults to DATASET_PATH env or datasets/esp32-cam/dataset.csv).",
     )
     parser.add_argument(
         "--epochs",
         type=int,
-        default=int(os.getenv("EPOCHS", "20")),
+        default=int(os.getenv("EPOCHS", "28")),
         help="Number of epochs for the Transformer autoencoder.",
     )
     parser.add_argument(

@@ -32,7 +32,7 @@ logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO"))
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 APP_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_MODEL_DIR = APP_ROOT / "models"
-DEFAULT_DATASET = PROJECT_ROOT / "datasets" / "esp32-cam" / "esp32_win3_dataset.csv"
+DEFAULT_DATASET = PROJECT_ROOT / "datasets" / "esp32-cam" / "dataset.csv"
 DEFAULT_DB_URL = os.getenv(
     "DATABASE_URL", "postgresql://safeon:0987@localhost:5432/safeon"
 )
@@ -166,6 +166,7 @@ class ModelService:
         "bps",
     ]
     feature_columns = base_feature_columns + ["pps_delta", "bps_delta"]
+    # delta 특성을 포함해 정적 값 + 변화량을 동시에 학습한다.
 
     def __init__(
         self,
@@ -212,6 +213,7 @@ class ModelService:
         self.engine = create_engine(self.database_url) if self.database_url else None
         self.model_loaded = False
         self.prev_flow_stats: Dict[Tuple[str, str, int, int, str], Tuple[float, float]] = {}
+        # 최근 플로우의 pps/bps를 기억해 추론 시 delta를 보정한다.
 
         os.makedirs(self.model_dir, exist_ok=True)
         self._load_artifacts()
@@ -239,7 +241,7 @@ class ModelService:
     # ---------------------------------------------------
     # Training
     # ---------------------------------------------------
-    def train(self, dataset_path: Optional[Path] = None, epochs: int = 20, batch_size: int = 32) -> Dict[str, str]:
+    def train(self, dataset_path: Optional[Path] = None, epochs: int = 28, batch_size: int = 32) -> Dict[str, str]:
         path = Path(dataset_path or self.dataset_path)
         if not path.exists():
             raise FileNotFoundError(f"Dataset not found at {path}")
@@ -259,6 +261,7 @@ class ModelService:
         df["duration"] = df["duration"].astype(float)
         df["pps"] = df["pps"].astype(float)
         df["bps"] = df["bps"].astype(float)
+        # 시계열 순서에 맞춰 플로우별 변화량 컬럼을 추가한다.
         df = self._inject_rate_deltas(df)
         df["pps"] = np.log1p(df["pps"])
         df["bps"] = np.log1p(df["bps"])
@@ -302,7 +305,7 @@ class ModelService:
         joblib.dump(self.scaler, self.paths.scaler)
 
         LOGGER.info("Training IsolationForest on normal samples only")
-        # 1차 이상징후 후보를 찾기 위해 IsolationForest를 학습한다.
+        # 1차 이상 후보를 찾기 위해 IsolationForest를 학습한다.
         self.iso_model = IsolationForest(contamination=0.05, random_state=42)
         self.iso_model.fit(scaled_normal)
         joblib.dump(self.iso_model, self.paths.isolation_forest)
@@ -495,6 +498,7 @@ class ModelService:
         )
 
     def _resolve_flow_deltas(self, flow: FlowFeatures, current_pps: float, current_bps: float) -> Tuple[float, float]:
+        # MQTT/REST 입력에 delta가 없으면 최근 관측값 기준으로 계산한다.
         key = self._flow_key(flow)
         prev_pps, prev_bps = self.prev_flow_stats.get(key, (current_pps, current_bps))
         delta_pps = float(current_pps - prev_pps)
@@ -529,6 +533,7 @@ class ModelService:
         df["pps"] = df["pps"].astype(float)
         df["bps"] = df["bps"].astype(float)
 
+        # 추론 시점의 delta 값을 보정해 정규화 파이프라인에 맞춘다.
         pps_delta, bps_delta = self._resolve_flow_deltas(flow, float(df.at[0, "pps"]), float(df.at[0, "bps"]))
         df.loc[:, "pps_delta"] = pps_delta
         df.loc[:, "bps_delta"] = bps_delta
@@ -571,25 +576,20 @@ class ModelService:
 
         hybrid_scores = self._compute_hybrid_scores(scaled)
         normal_scores = [score for score, label in zip(hybrid_scores, labels) if label == 0]
-        attack_scores = [score for score, label in zip(hybrid_scores, labels) if label != 0]
-
-        if not normal_scores or not attack_scores:
+        if not normal_scores:
             LOGGER.warning(
-                "Unable to compute threshold (normal=%s, attack=%s). Retaining %.4f",
+                "Unable to compute threshold (normal=%s). Retaining %.4f",
                 len(normal_scores),
-                len(attack_scores),
                 self.threshold,
             )
             return self.threshold
 
         normal_stat = float(np.max(normal_scores))
-        attack_stat = float(np.min(attack_scores))
-        threshold = float(0.5 * (normal_stat + attack_stat))
+        threshold = float(min(1.0, normal_stat + 0.2))
         LOGGER.info(
-            "Computed threshold %.4f (max normal=%.4f, min attack=%.4f)",
+            "Computed threshold %.5f (max normal=%.5f, +margin=0.2)",
             threshold,
-            normal_stat,
-            attack_stat,
+            round(normal_stat, 5),
         )
         return threshold
 
