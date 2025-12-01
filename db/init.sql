@@ -78,6 +78,7 @@ CREATE TABLE anomaly_scores (
     iso_score DOUBLE PRECISION,
     ae_score DOUBLE PRECISION,
     hybrid_score DOUBLE PRECISION,
+    gbm_score DOUBLE PRECISION,
     is_anom BOOLEAN
 );
 
