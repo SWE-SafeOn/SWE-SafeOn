@@ -13,7 +13,7 @@
     "pps_delta",
     "bps_delta"
   ],
-  "threshold": 0.8253053744776992,
+  "threshold": 0.8042427336332556,
   "ae_type": "feedforward",
   "iso_decision_min": -0.10732948701329048,
   "iso_decision_max": 0.28920719931374006

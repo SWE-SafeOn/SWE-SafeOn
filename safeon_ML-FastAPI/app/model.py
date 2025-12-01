@@ -404,6 +404,8 @@ class ModelService:
             except Exception as exc:  # noqa: BLE001
                 LOGGER.warning("LightGBM prediction failed: %s", exc)
         gbm_contrib = gbm_score if gbm_score is not None else 0.5
+        gbm_contrib = float(max(0.0, min(1.0, gbm_contrib)))
+        gbm_score = gbm_contrib if gbm_score is not None else None
         hybrid_score = float((iso_score + ae_score + gbm_contrib) / 3.0)
         is_anom = hybrid_score >= self.threshold
         record_id = self._persist_score(
@@ -603,6 +605,7 @@ class ModelService:
                 if self.gbm_model is not None
                 else 0.5
             )
+            gbm_score = float(max(0.0, min(1.0, gbm_score)))
             scores.append(float((iso_score + ae_score + gbm_score) / 3.0))
         return scores
 
