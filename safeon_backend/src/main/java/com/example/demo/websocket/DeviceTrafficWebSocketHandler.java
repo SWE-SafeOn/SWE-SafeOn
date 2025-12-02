@@ -57,7 +57,7 @@ public class DeviceTrafficWebSocketHandler extends TextWebSocketHandler {
 
         DeviceTrafficService.DeviceTrafficSnapshot snapshot;
         try {
-            snapshot = deviceTrafficService.getLastHourSnapshot(deviceId, user.userId());
+            snapshot = deviceTrafficService.getRecentSnapshot(deviceId, user.userId());
         } catch (Exception ex) {
             log.warn("Failed to prepare traffic snapshot. deviceId={}, userId={}", deviceId, user.userId(), ex);
             session.close(CloseStatus.POLICY_VIOLATION.withReason(ex.getMessage()));
