@@ -30,4 +30,15 @@ public interface AnomalyScoreRepository extends JpaRepository<AnomalyScore, UUID
             @Param("start") OffsetDateTime start,
             @Param("end") OffsetDateTime end
     );
+
+    @Query("select max(a.ts) from AnomalyScore a where a.isAnom = false")
+    OffsetDateTime findLastNormalTimestamp();
+
+    @Query("""
+            select count(a)
+            from AnomalyScore a
+            where a.isAnom = true
+              and (:since is null or a.ts > :since)
+            """)
+    long countAnomaliesSince(@Param("since") OffsetDateTime since);
 }

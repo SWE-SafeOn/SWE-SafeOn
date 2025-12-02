@@ -85,9 +85,10 @@ public class MlResultMqttListener implements MqttPacketListener {
         }
 
         OffsetDateTime ts = resolveTime(payload.timestamp());
+        OffsetDateTime eventTs = ts != null ? ts : OffsetDateTime.now();
 
         AnomalyScore score = AnomalyScore.builder()
-                .ts(ts != null ? ts : OffsetDateTime.now())
+                .ts(eventTs)
                 .packetMeta(payload.packetMetaId())
                 .isoScore(payload.isoScore())
                 .rfScore(payload.rfScore())
@@ -100,9 +101,21 @@ public class MlResultMqttListener implements MqttPacketListener {
             return;
         }
 
+        OffsetDateTime lastNormalTs = anomalyScoreRepository.findLastNormalTimestamp();
+        long consecutiveAnomalyCount = anomalyScoreRepository.countAnomaliesSince(lastNormalTs);
+        boolean alreadyNotified = lastNormalTs != null
+                ? alertRepository.existsByTsAfter(lastNormalTs)
+                : alertRepository.findLatestAlertTimestamp() != null;
+
+        if (consecutiveAnomalyCount < 3 || alreadyNotified) {
+            log.info("Skip alert creation. consecutiveAnomalyCount={}, alreadyNotified={}",
+                    consecutiveAnomalyCount, alreadyNotified);
+            return;
+        }
+
         Device device = resolveDevice(payload.deviceId(), packetMeta);
         Alert alert = Alert.builder()
-                .ts(ts != null ? ts : OffsetDateTime.now())
+                .ts(eventTs)
                 .device(device)
                 .severity(StringUtils.hasText(payload.severity()) ? payload.severity() : DEFAULT_SEVERITY)
                 .reason(StringUtils.hasText(payload.reason()) ? payload.reason() : DEFAULT_REASON)
