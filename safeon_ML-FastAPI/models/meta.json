@@ -15,9 +15,7 @@
     "pps_cum_increase",
     "bps_cum_increase"
   ],
-  "threshold": 0.5826943898532155,
-  "ae_type": "lstm",
-  "seq_len": 20,
+  "threshold": 0.7740415847798234,
   "iso_decision_min": -0.10999619781275871,
   "iso_decision_max": 0.2802398785860044
 }

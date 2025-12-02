@@ -1,23 +1,19 @@
 import json
 import logging
 import os
-from collections import deque
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Deque, Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 from uuid import UUID, uuid4
 
 import joblib
 import numpy as np
 import pandas as pd
-import torch
-import torch.nn as nn
 from pydantic import BaseModel, validator
 from sklearn.ensemble import IsolationForest, RandomForestClassifier
 from sklearn.preprocessing import LabelEncoder, MinMaxScaler
 from sqlalchemy import create_engine, text
-from torch.utils.data import DataLoader, TensorDataset
 
 # ---------------------------------------------------
 # Logging
@@ -42,41 +38,6 @@ DEFAULT_DB_URL = os.getenv(
 # ---------------------------------------------------
 # Models and schema
 # ---------------------------------------------------
-class LstmAE(nn.Module):
-    def __init__(
-        self,
-        num_features: int,
-        seq_len: int,
-        hidden_dim: int = 64,
-        latent_dim: int = 32,
-        num_layers: int = 1,
-    ):
-        super().__init__()
-        self.seq_len = seq_len
-        self.encoder = nn.LSTM(
-            input_size=num_features,
-            hidden_size=hidden_dim,
-            num_layers=num_layers,
-            batch_first=True,
-        )
-        self.enc_to_latent = nn.Linear(hidden_dim, latent_dim)
-        self.latent_to_hidden = nn.Linear(latent_dim, hidden_dim)
-        self.decoder = nn.LSTM(
-            input_size=hidden_dim,
-            hidden_size=hidden_dim,
-            num_layers=num_layers,
-            batch_first=True,
-        )
-        self.output_layer = nn.Linear(hidden_dim, num_features)
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        _, (hidden, _) = self.encoder(x)
-        latent = torch.tanh(self.enc_to_latent(hidden[-1]))
-        decoder_input = torch.tanh(self.latent_to_hidden(latent)).unsqueeze(1).repeat(1, self.seq_len, 1)
-        decoded, _ = self.decoder(decoder_input)
-        return self.output_layer(decoded)
-
-
 class FlowFeatures(BaseModel):
     """Pydantic model for incoming flow records."""
 
@@ -160,7 +121,6 @@ class ArtifactPaths:
     enc_proto: Path
     scaler: Path
     isolation_forest: Path
-    autoencoder: Path
     meta: Path
     rf_model: Path
 
@@ -199,7 +159,6 @@ class ModelService:
         database_url: Optional[str] = DEFAULT_DB_URL,
         allow_dummy: bool = True,
         threshold: float = 0.35,
-        seq_len: int = 20,
     ) -> None:
         self.model_dir = Path(model_dir)
         self.dataset_path = Path(dataset_path)
@@ -207,15 +166,6 @@ class ModelService:
         self.database_url = database_url
         self.allow_dummy = allow_dummy
         self.threshold = threshold
-        self.seq_len = seq_len
-        self.num_features = len(self.feature_columns)
-
-        self.device = torch.device(
-            "mps"
-            if torch.backends.mps.is_available()
-            else ("cuda" if torch.cuda.is_available() else "cpu")
-        )
-        # 가능하면 GPU/MPS를 활용해 학습·추론 속도를 확보한다.
 
         self.paths = ArtifactPaths(
             enc_src_ip=self.model_dir / "enc_src_ip.pkl",
@@ -223,7 +173,6 @@ class ModelService:
             enc_proto=self.model_dir / "enc_proto.pkl",
             scaler=self.model_dir / "scaler.pkl",
             isolation_forest=self.model_dir / "isolation_forest.pkl",
-            autoencoder=self.model_dir / "autoencoder.pth",
             meta=self.model_dir / "meta.json",
             rf_model=self.model_dir / "rf_model.pkl",
         )
@@ -233,14 +182,12 @@ class ModelService:
         self.enc_proto: Optional[LabelEncoder] = None
         self.scaler: Optional[MinMaxScaler] = None
         self.iso_model: Optional[IsolationForest] = None
-        self.autoencoder: Optional[LstmAE] = None
         self.rf_model: Optional[RandomForestClassifier] = None
         self.iso_decision_min: float = 0.0
         self.iso_decision_max: float = 1.0
         self.engine = create_engine(self.database_url) if self.database_url else None
         self.model_loaded = False
         self.prev_flow_stats: Dict[str, Tuple[float, float, float, float]] = {}
-        self.sequence_buffers: Dict[str, Deque[np.ndarray]] = {}
         # 최근 플로우의 pps/bps를 기억해 추론 시 delta를 보정한다.
 
         os.makedirs(self.model_dir, exist_ok=True)
@@ -253,7 +200,6 @@ class ModelService:
     def from_env(cls) -> "ModelService":
         allow_dummy = os.getenv("ALLOW_DUMMY", "true").lower() != "false"
         threshold = float(os.getenv("ANOMALY_THRESHOLD", "0.35"))
-        seq_len = int(os.getenv("SEQ_LEN", "20"))
 
         model_dir = Path(os.getenv("MODEL_DIR", DEFAULT_MODEL_DIR))
         dataset_path = Path(os.getenv("DATASET_PATH", DEFAULT_DATASET))
@@ -267,7 +213,6 @@ class ModelService:
             database_url=database_url,
             allow_dummy=allow_dummy,
             threshold=threshold,
-            seq_len=seq_len,
         )
 
     # ---------------------------------------------------
@@ -277,8 +222,6 @@ class ModelService:
         self,
         dataset_path: Optional[Path] = None,
         attacker_dataset_path: Optional[Path] = None,
-        epochs: int = 28,
-        batch_size: int = 32,
     ) -> Dict[str, str]:
         path = Path(dataset_path or self.dataset_path)
         if not path.exists():
@@ -392,34 +335,6 @@ class ModelService:
         if self.iso_decision_max - self.iso_decision_min <= 1e-9:
             self.iso_decision_max = self.iso_decision_min + 1e-6
 
-        normal_sequences = self._build_sequences_from_df(encoded, require_all_normal=True)
-        if normal_sequences.size == 0:
-            raise ValueError("Not enough normal sequences to train the LSTM autoencoder.")
-        sequence_tensor = torch.tensor(normal_sequences, dtype=torch.float32)
-        sequence_dataset = TensorDataset(sequence_tensor)
-        dataset = DataLoader(sequence_dataset, batch_size=batch_size, shuffle=True)
-
-        LOGGER.info("Training LSTM Autoencoder on %s using %s sequences", self.device, sequence_tensor.shape)
-        self.autoencoder = LstmAE(num_features=self.num_features, seq_len=self.seq_len).to(self.device)
-        optimizer = torch.optim.Adam(self.autoencoder.parameters(), lr=1e-3)
-        criterion = nn.MSELoss()
-
-        for epoch in range(1, epochs + 1):
-            self.autoencoder.train()
-            epoch_loss = 0.0
-            for batch_x, in dataset:
-                batch_x = batch_x.to(self.device)
-                optimizer.zero_grad()
-                recon = self.autoencoder(batch_x)
-                loss = criterion(recon, batch_x)
-                loss.backward()
-                optimizer.step()
-                epoch_loss += loss.item()
-            LOGGER.info("AE epoch %s/%s - loss=%.6f", epoch, epochs, epoch_loss)
-
-        self.autoencoder.eval()
-        torch.save(self.autoencoder.state_dict(), self.paths.autoencoder)
-
         LOGGER.info("Training RandomForest classifier on labeled data")
         self.rf_model = RandomForestClassifier(
             n_estimators=500,
@@ -437,12 +352,10 @@ class ModelService:
             LOGGER.warning("Skipping RandomForest training (only one label present: %s)", unique_labels.tolist())
             self.rf_model = None
 
-        self.threshold = self._calculate_threshold(encoded)
+        self.threshold = self._calculate_threshold(scaled_all, labels_all)
         meta = {
             "feature_columns": self.feature_columns,
             "threshold": self.threshold,
-            "ae_type": "lstm",
-            "seq_len": self.seq_len,
             "iso_decision_min": self.iso_decision_min,
             "iso_decision_max": self.iso_decision_max,
         }
@@ -452,7 +365,6 @@ class ModelService:
         return {
             "dataset": str(path),
             "model_dir": str(self.model_dir),
-            "device": str(self.device),
         }
 
     # ---------------------------------------------------
@@ -475,27 +387,17 @@ class ModelService:
             return self._dummy_result(ts)
 
         scaled_vec = self._transform_flow(flow)
-        flow_key = self._flow_key(flow)
-        sequence = self._append_sequence(flow_key, scaled_vec, require_full=False)
 
-        # IsolationForest와 LSTM AE + RandomForest 점수를 혼합해 최종 hybrid 이상 점수를 만든다.
+        # IsolationForest와 RandomForest 점수를 혼합해 최종 hybrid 이상 점수를 만든다.
         iso_score = self._iso_score(scaled_vec)
-        ae_score = float(self._ae_score(sequence) or 0.0)
-        rf_score = None
-        if self.rf_model is not None:
-            try:
-                rf_score = float(self.rf_model.predict_proba([scaled_vec])[0][1])
-            except Exception as exc:  # noqa: BLE001
-                LOGGER.warning("RandomForest prediction failed: %s", exc)
+        rf_score = self._rf_score(scaled_vec)
         rf_contrib = rf_score if rf_score is not None else 0.5
         rf_contrib = float(max(0.0, min(1.0, rf_contrib)))
-        rf_score = rf_contrib if rf_score is not None else None
-        hybrid_score = float((iso_score + ae_score + rf_contrib) / 3.0)
+        hybrid_score = float((iso_score + rf_contrib) / 2.0)
         is_anom = hybrid_score >= self.threshold
         record_id = self._persist_score(
             ts=ts,
             iso_score=iso_score,
-            ae_score=ae_score,
             rf_score=rf_score,
             hybrid_score=hybrid_score,
             is_anom=is_anom,
@@ -506,7 +408,6 @@ class ModelService:
         return {
             "is_anom": is_anom,
             "iso_score": iso_score,
-            "ae_score": ae_score,
             "hybrid_score": hybrid_score,
             "rf_score": rf_score
         }
@@ -521,7 +422,6 @@ class ModelService:
             self.paths.enc_proto,
             self.paths.scaler,
             self.paths.isolation_forest,
-            self.paths.autoencoder,
         ]
 
         if not all(path.exists() for path in required):
@@ -538,26 +438,15 @@ class ModelService:
         self.scaler = joblib.load(self.paths.scaler)
         self.iso_model = joblib.load(self.paths.isolation_forest)
 
-        seq_len = self.seq_len
         if self.paths.meta.exists():
             try:
                 meta = json.loads(self.paths.meta.read_text())
                 self.threshold = float(meta.get("threshold", self.threshold))
                 self.iso_decision_min = float(meta.get("iso_decision_min", self.iso_decision_min))
                 self.iso_decision_max = float(meta.get("iso_decision_max", self.iso_decision_max))
-                seq_len = int(meta.get("seq_len", seq_len))
             except Exception as exc:  # noqa: BLE001
                 LOGGER.warning("Failed to parse meta.json: %s", exc)
-        self.seq_len = seq_len
 
-        self.autoencoder = LstmAE(num_features=self.num_features, seq_len=self.seq_len).to(self.device)
-        try:
-            state_dict = torch.load(self.paths.autoencoder, map_location=self.device)
-            self.autoencoder.load_state_dict(state_dict)
-            self.autoencoder.eval()
-        except Exception as exc:  # noqa: BLE001
-            LOGGER.warning("Failed to load LSTM AE weights. Retrain required: %s", exc)
-            self.autoencoder = None
         if self.paths.rf_model.exists():
             try:
                 self.rf_model = joblib.load(self.paths.rf_model)
@@ -568,8 +457,7 @@ class ModelService:
             self.rf_model = None
 
         self.prev_flow_stats.clear()
-        self.sequence_buffers.clear()
-        self.model_loaded = all([self.iso_model, self.autoencoder, self.rf_model])
+        self.model_loaded = all([self.iso_model, self.rf_model])
 
     def _safe_label_encode(self, encoder: LabelEncoder, value: str) -> int:
         classes = set(encoder.classes_.tolist())
@@ -589,28 +477,6 @@ class ModelService:
             ]
         )
 
-    def _append_sequence(
-        self,
-        key: str,
-        vec: np.ndarray,
-        buffers: Optional[Dict[str, Deque[np.ndarray]]] = None,
-        require_full: bool = True,
-    ) -> Optional[np.ndarray]:
-        target = buffers if buffers is not None else self.sequence_buffers
-        seq = target.get(key)
-        if seq is None:
-            seq = deque(maxlen=self.seq_len)
-            target[key] = seq
-        seq.append(vec)
-        if len(seq) >= self.seq_len:
-            return np.stack(list(seq)[-self.seq_len :], axis=0)
-        if not require_full and len(seq) > 0:
-            # Pad with the most recent vector so AE can run with partial history.
-            current = list(seq)
-            pad_vec = current[-1]
-            padding = [pad_vec] * (self.seq_len - len(current))
-            return np.stack(current + padding, axis=0)
-        return None
 
     def _resolve_flow_deltas(
         self, flow: FlowFeatures, current_pps: float, current_bps: float
@@ -687,17 +553,6 @@ class ModelService:
         scaled = self.scaler.transform(df[self.feature_columns])
         return scaled[0]
 
-    def _ae_score(self, sequence: Optional[np.ndarray]) -> Optional[float]:
-        if self.autoencoder is None or sequence is None or len(sequence) < self.seq_len:
-            return None
-
-        tensor = torch.tensor(sequence.reshape(1, self.seq_len, -1), dtype=torch.float32).to(self.device)
-
-        with torch.no_grad():
-            recon = self.autoencoder(tensor)
-        mse = torch.mean((tensor - recon) ** 2).item()
-        return float(min(1.0, mse * 10))
-
     def _iso_score(self, scaled_vec: np.ndarray) -> float:
         if self.iso_model is None:
             return 0.0
@@ -709,11 +564,26 @@ class ModelService:
         score = (self.iso_decision_max - raw) / span
         return float(max(0.0, min(1.0, score)))
 
-    def _calculate_threshold(self, df: pd.DataFrame) -> float:
-        if self.iso_model is None:
+    def _rf_score(self, scaled_vec: np.ndarray) -> Optional[float]:
+        if self.rf_model is None:
+            return None
+        try:
+            return float(self.rf_model.predict_proba([scaled_vec])[0][1])
+        except Exception as exc:  # noqa: BLE001
+            LOGGER.warning("RandomForest prediction failed: %s", exc)
+            return None
+
+    def _calculate_threshold(self, features: np.ndarray, labels: np.ndarray) -> float:
+        if self.iso_model is None or features.size == 0:
             return self.threshold
 
-        hybrid_scores, labels = self._compute_hybrid_scores(df)
+        hybrid_scores: List[float] = []
+        for vec in features:
+            iso_score = self._iso_score(vec)
+            rf_score = self._rf_score(vec)
+            rf_contrib = rf_score if rf_score is not None else 0.5
+            hybrid_scores.append(float((iso_score + rf_contrib) / 2.0))
+
         normal_scores = [score for score, label in zip(hybrid_scores, labels) if label == 0]
         if not normal_scores:
             LOGGER.warning(
@@ -731,45 +601,6 @@ class ModelService:
             round(normal_stat, 5),
         )
         return threshold
-
-    def _compute_hybrid_scores(self, df: pd.DataFrame) -> Tuple[List[float], List[int]]:
-        scores: List[float] = []
-        labels: List[int] = []
-        buffers: Dict[str, Deque[np.ndarray]] = {}
-        df_sorted = df.sort_values("start_time")
-        for _, row in df_sorted.iterrows():
-            vec = row[self.feature_columns].to_numpy(dtype=float)
-            key = row["flow_key"]
-            sequence = self._append_sequence(key, vec, buffers)
-            iso_score = self._iso_score(vec)
-            ae_score = self._ae_score(sequence) or 0.0
-            rf_score = (
-                float(self.rf_model.predict_proba([vec])[0][1])
-                if self.rf_model is not None
-                else 0.5
-            )
-            rf_score = float(max(0.0, min(1.0, rf_score)))
-            scores.append(float((iso_score + ae_score + rf_score) / 3.0))
-            labels.append(int(row["label"]))
-        return scores, labels
-
-    def _build_sequences_from_df(
-        self, df: pd.DataFrame, require_all_normal: bool = False
-    ) -> np.ndarray:
-        sequences: List[np.ndarray] = []
-        for _, group in df.sort_values("start_time").groupby("flow_key"):
-            values = group[self.feature_columns].to_numpy()
-            labels = group["label"].to_numpy()
-            if len(values) < self.seq_len:
-                continue
-            for start in range(0, len(values) - self.seq_len + 1):
-                end = start + self.seq_len
-                if require_all_normal and not np.all(labels[start:end] == 0):
-                    continue
-                sequences.append(values[start:end])
-        if not sequences:
-            return np.empty((0, self.seq_len, self.num_features), dtype=np.float32)
-        return np.asarray(sequences, dtype=np.float32)
 
     def _inject_rate_deltas(self, df: pd.DataFrame) -> pd.DataFrame:
         working = df.copy()
@@ -805,7 +636,6 @@ class ModelService:
         self,
         ts: datetime,
         iso_score: float,
-        ae_score: float,
         rf_score: Optional[float],
         hybrid_score: float,
         is_anom: bool,
@@ -822,7 +652,6 @@ class ModelService:
             "packet_meta_id": packet_meta_id,
             "alert_id": None,
             "iso_score": iso_score,
-            "ae_score": ae_score,
             "rf_score": rf_score,
             "hybrid_score": hybrid_score,
             "is_anom": is_anom,
@@ -831,9 +660,9 @@ class ModelService:
         query = text(
             """
             INSERT INTO anomaly_scores (
-                score_id, ts, packet_meta_id, alert_id, iso_score, ae_score, rf_score, hybrid_score, is_anom
+                score_id, ts, packet_meta_id, alert_id, iso_score, rf_score, hybrid_score, is_anom
             )
-            VALUES (:score_id, :ts, :packet_meta_id, :alert_id, :iso_score, :ae_score, :rf_score, :hybrid_score, :is_anom)
+            VALUES (:score_id, :ts, :packet_meta_id, :alert_id, :iso_score, :rf_score, :hybrid_score, :is_anom)
             """
         )
 
@@ -849,7 +678,6 @@ class ModelService:
         return {
             "is_anom": False,
             "iso_score": 0.0,
-            "ae_score": 0.0,
             "hybrid_score": 0.0,
             "rf_score": 0.5,
         }

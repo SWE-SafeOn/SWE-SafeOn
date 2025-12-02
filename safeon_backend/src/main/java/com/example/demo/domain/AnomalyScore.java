@@ -31,9 +31,6 @@ public class AnomalyScore {
     @Column(name = "iso_score")
     private Double isoScore;
 
-    @Column(name = "ae_score")
-    private Double aeScore;
-
     @Column(name = "rf_score")
     private Double rfScore;
 
