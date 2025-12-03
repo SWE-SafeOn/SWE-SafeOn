@@ -572,7 +572,7 @@ class ModelService:
         except Exception as exc:  # noqa: BLE001
             LOGGER.warning("RandomForest prediction failed: %s", exc)
             return None
-
+        
     def _calculate_threshold(self, features: np.ndarray, labels: np.ndarray) -> float:  # noqa: ARG002
         """Use the configured static threshold (default 0.74)."""
         LOGGER.info("Using fixed anomaly threshold: %.2f", self.threshold)
