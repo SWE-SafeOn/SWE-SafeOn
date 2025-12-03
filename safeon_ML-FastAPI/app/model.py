@@ -158,7 +158,7 @@ class ModelService:
         attacker_dataset_path: Optional[Path] = DEFAULT_ATTACKER_DATASET,
         database_url: Optional[str] = DEFAULT_DB_URL,
         allow_dummy: bool = True,
-        threshold: float = 0.35,
+        threshold: float = 0.74,
     ) -> None:
         self.model_dir = Path(model_dir)
         self.dataset_path = Path(dataset_path)
@@ -199,7 +199,7 @@ class ModelService:
     @classmethod
     def from_env(cls) -> "ModelService":
         allow_dummy = os.getenv("ALLOW_DUMMY", "true").lower() != "false"
-        threshold = float(os.getenv("ANOMALY_THRESHOLD", "0.35"))
+        threshold = float(os.getenv("ANOMALY_THRESHOLD", "0.74"))
 
         model_dir = Path(os.getenv("MODEL_DIR", DEFAULT_MODEL_DIR))
         dataset_path = Path(os.getenv("DATASET_PATH", DEFAULT_DATASET))
@@ -573,34 +573,10 @@ class ModelService:
             LOGGER.warning("RandomForest prediction failed: %s", exc)
             return None
 
-    def _calculate_threshold(self, features: np.ndarray, labels: np.ndarray) -> float:
-        if self.iso_model is None or features.size == 0:
-            return self.threshold
-
-        hybrid_scores: List[float] = []
-        for vec in features:
-            iso_score = self._iso_score(vec)
-            rf_score = self._rf_score(vec)
-            rf_contrib = rf_score if rf_score is not None else 0.5
-            hybrid_scores.append(float((iso_score + rf_contrib) / 2.0))
-
-        normal_scores = [score for score, label in zip(hybrid_scores, labels) if label == 0]
-        if not normal_scores:
-            LOGGER.warning(
-                "Unable to compute threshold (normal=%s). Retaining %.4f",
-                len(normal_scores),
-                self.threshold,
-            )
-            return self.threshold
-
-        normal_stat = float(np.max(normal_scores))
-        threshold = float(min(1.0, normal_stat + 0.16))
-        LOGGER.info(
-            "Computed threshold %.5f (max normal=%.5f, +margin=0.16)",
-            threshold,
-            round(normal_stat, 5),
-        )
-        return threshold
+    def _calculate_threshold(self, features: np.ndarray, labels: np.ndarray) -> float:  # noqa: ARG002
+        """Use the configured static threshold (default 0.74)."""
+        LOGGER.info("Using fixed anomaly threshold: %.2f", self.threshold)
+        return self.threshold
 
     def _inject_rate_deltas(self, df: pd.DataFrame) -> pd.DataFrame:
         working = df.copy()
