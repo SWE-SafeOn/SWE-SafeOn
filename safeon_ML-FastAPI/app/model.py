@@ -594,9 +594,9 @@ class ModelService:
             return self.threshold
 
         normal_stat = float(np.max(normal_scores))
-        threshold = float(min(1.0, normal_stat + 0.2))
+        threshold = float(min(1.0, normal_stat + 0.16))
         LOGGER.info(
-            "Computed threshold %.5f (max normal=%.5f, +margin=0.2)",
+            "Computed threshold %.5f (max normal=%.5f, +margin=0.16)",
             threshold,
             round(normal_stat, 5),
         )

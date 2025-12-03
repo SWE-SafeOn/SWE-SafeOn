@@ -249,24 +249,49 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
             ),
           ),
           const SizedBox(height: 12),
-          SizedBox(
-            height: 240,
-            child: _buildLineChart(),
+          _buildMetricGraph(
+            title: 'PPS 그래프',
+            legendLabel: 'PPS (packet/s)',
+            spots: _metricSpots((point) => point.pps),
+            lineGradient: const LinearGradient(
+              colors: [SafeOnColors.primary, SafeOnColors.primaryVariant],
+              begin: Alignment.centerLeft,
+              end: Alignment.centerRight,
+            ),
+            areaGradient: LinearGradient(
+              colors: [
+                SafeOnColors.primary.withValues(alpha: 0.18),
+                SafeOnColors.primary.withValues(alpha: 0.06),
+              ],
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+            ),
+          ),
+          const SizedBox(height: 16),
+          _buildMetricGraph(
+            title: 'BPS 그래프',
+            legendLabel: 'BPS (byte/s)',
+            spots: _metricSpots((point) => point.bps),
+            lineGradient: const LinearGradient(
+              colors: [SafeOnColors.accent, Color(0xFFFFD384)],
+              begin: Alignment.centerLeft,
+              end: Alignment.centerRight,
+            ),
+            areaGradient: LinearGradient(
+              colors: [
+                SafeOnColors.accent.withValues(alpha: 0.2),
+                SafeOnColors.accent.withValues(alpha: 0.08),
+              ],
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+            ),
           ),
           const SizedBox(height: 12),
-          Wrap(
-            spacing: 14,
-            runSpacing: 8,
-            children: [
-              _buildLegendDot(SafeOnColors.primary, 'PPS (packet/s)'),
-              _buildLegendDot(SafeOnColors.accent, 'BPS (byte/s)'),
-              if (_trafficWindowStart != null)
-                Text(
-                  '기준: ${DateFormat('HH:mm').format(_trafficWindowStart!.toLocal())} ~ ${DateFormat('HH:mm').format(DateTime.now().toLocal())}',
-                  style: const TextStyle(color: SafeOnColors.textSecondary, fontSize: 12),
-                ),
-            ],
-          ),
+          if (_trafficWindowStart != null)
+            Text(
+              '기준: ${DateFormat('HH:mm').format(_trafficWindowStart!.toLocal())} ~ ${DateFormat('HH:mm').format(DateTime.now().toLocal())}',
+              style: const TextStyle(color: SafeOnColors.textSecondary, fontSize: 12),
+            ),
         ],
       );
     }
@@ -274,7 +299,7 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildSectionTitle('최근 1시간 트래픽 추이'),
+        _buildSectionTitle('최근 15분 트래픽 추이'),
         const SizedBox(height: 8),
         Container(
           padding: const EdgeInsets.all(16),
@@ -704,57 +729,86 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
     return '$prefix$formatted${units[unitIndex]}';
   }
 
-  Widget _buildLineChart() {
-    List<FlSpot> _anchorSpots(
-      double Function(DeviceTrafficPoint point) selector,
-    ) {
-      if (_trafficPoints.isEmpty) return const [];
-
-      final start = (_trafficWindowStart ?? _trafficPoints.first.timestamp)
-          .millisecondsSinceEpoch
-          .toDouble();
-      final nowMs = DateTime.now().millisecondsSinceEpoch.toDouble();
-
-      final firstValue = selector(_trafficPoints.first);
-      final lastValue = selector(_trafficPoints.last);
-
-      final spots = <FlSpot>[
-        FlSpot(start, firstValue),
-        ..._trafficPoints.map(
-          (point) => FlSpot(
-            point.timestamp.millisecondsSinceEpoch.toDouble(),
-            selector(point),
+  Widget _buildMetricGraph({
+    required String title,
+    required String legendLabel,
+    required List<FlSpot> spots,
+    required LinearGradient lineGradient,
+    required LinearGradient areaGradient,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Text(
+              title,
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(width: 10),
+            _buildLegendDot(lineGradient.colors.first, legendLabel),
+          ],
+        ),
+        const SizedBox(height: 10),
+        SizedBox(
+          height: 220,
+          child: _buildLineChart(
+            spots: spots,
+            lineGradient: lineGradient,
+            areaGradient: areaGradient,
           ),
         ),
-      ];
+      ],
+    );
+  }
 
-      final last = _trafficPoints.last;
-      final lastMs = last.timestamp.millisecondsSinceEpoch.toDouble();
-      if (nowMs > lastMs) {
-        spots.add(FlSpot(nowMs, lastValue));
-      }
+  List<FlSpot> _metricSpots(
+    double Function(DeviceTrafficPoint point) selector,
+  ) {
+    if (_trafficPoints.isEmpty) return const [];
 
-      return spots;
+    final start = (_trafficWindowStart ?? _trafficPoints.first.timestamp)
+        .millisecondsSinceEpoch
+        .toDouble();
+    final nowMs = DateTime.now().millisecondsSinceEpoch.toDouble();
+
+    final firstValue = selector(_trafficPoints.first);
+    final lastValue = selector(_trafficPoints.last);
+
+    final spots = <FlSpot>[
+      FlSpot(start, firstValue),
+      ..._trafficPoints.map(
+        (point) => FlSpot(
+          point.timestamp.millisecondsSinceEpoch.toDouble(),
+          selector(point),
+        ),
+      ),
+    ];
+
+    final last = _trafficPoints.last;
+    final lastMs = last.timestamp.millisecondsSinceEpoch.toDouble();
+    if (nowMs > lastMs) {
+      spots.add(FlSpot(nowMs, lastValue));
     }
 
-    final spotsPps = _anchorSpots((point) => point.pps);
-    final spotsBps = _anchorSpots((point) => point.bps);
+    return spots;
+  }
 
-    if (spotsPps.isEmpty && spotsBps.isEmpty) {
+  Widget _buildLineChart({
+    required List<FlSpot> spots,
+    required LinearGradient lineGradient,
+    required LinearGradient areaGradient,
+  }) {
+    if (spots.isEmpty) {
       return const SizedBox.shrink();
     }
 
-    final allX = [
-      ...spotsPps.map((p) => p.x),
-      ...spotsBps.map((p) => p.x),
-    ];
-    final minX = allX.isEmpty ? 0 : allX.reduce(math.min);
-    final maxX = allX.isEmpty ? 0 : allX.reduce(math.max);
-    final maxYValues = [
-      ...spotsPps.map((e) => e.y),
-      ...spotsBps.map((e) => e.y),
-    ];
-    final double maxY = maxYValues.isEmpty ? 0 : maxYValues.reduce(math.max);
+    final minX = spots.map((p) => p.x).reduce(math.min);
+    final maxX = spots.map((p) => p.x).reduce(math.max);
+    final maxY = spots.map((p) => p.y).reduce(math.max);
 
     final double rangeX = math.max(maxX - minX, 60000).toDouble(); // at least 1 min span
     final xPadding = rangeX * 0.06;
@@ -880,12 +934,8 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
               ),
               lineBarsData: [
                 LineChartBarData(
-                  spots: spotsPps,
-                  gradient: const LinearGradient(
-                    colors: [SafeOnColors.primary, SafeOnColors.primaryVariant],
-                    begin: Alignment.centerLeft,
-                    end: Alignment.centerRight,
-                  ),
+                  spots: spots,
+                  gradient: lineGradient,
                   barWidth: 3.6,
                   isCurved: true,
                   isStrokeCapRound: true,
@@ -893,38 +943,7 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
                   dotData: const FlDotData(show: false),
                   belowBarData: BarAreaData(
                     show: true,
-                    gradient: LinearGradient(
-                      colors: [
-                        SafeOnColors.primary.withValues(alpha: 0.18),
-                        SafeOnColors.primary.withValues(alpha: 0.06),
-                      ],
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                    ),
-                  ),
-                ),
-                LineChartBarData(
-                  spots: spotsBps,
-                  gradient: const LinearGradient(
-                    colors: [SafeOnColors.accent, Color(0xFFFFD384)],
-                    begin: Alignment.centerLeft,
-                    end: Alignment.centerRight,
-                  ),
-                  barWidth: 3.6,
-                  isCurved: true,
-                  isStrokeCapRound: true,
-                  preventCurveOverShooting: true,
-                  dotData: const FlDotData(show: false),
-                  belowBarData: BarAreaData(
-                    show: true,
-                    gradient: LinearGradient(
-                      colors: [
-                        SafeOnColors.accent.withValues(alpha: 0.2),
-                        SafeOnColors.accent.withValues(alpha: 0.08),
-                      ],
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                    ),
+                    gradient: areaGradient,
                   ),
                 ),
               ],
