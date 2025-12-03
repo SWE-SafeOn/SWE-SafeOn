@@ -158,7 +158,7 @@ class ModelService:
         attacker_dataset_path: Optional[Path] = DEFAULT_ATTACKER_DATASET,
         database_url: Optional[str] = DEFAULT_DB_URL,
         allow_dummy: bool = True,
-        threshold: float = 0.58,
+        threshold: float = 0.51,
     ) -> None:
         self.model_dir = Path(model_dir)
         self.dataset_path = Path(dataset_path)
@@ -199,7 +199,7 @@ class ModelService:
     @classmethod
     def from_env(cls) -> "ModelService":
         allow_dummy = os.getenv("ALLOW_DUMMY", "true").lower() != "false"
-        threshold = float(os.getenv("ANOMALY_THRESHOLD", "0.58"))
+        threshold = float(os.getenv("ANOMALY_THRESHOLD", "0.51"))
 
         model_dir = Path(os.getenv("MODEL_DIR", DEFAULT_MODEL_DIR))
         dataset_path = Path(os.getenv("DATASET_PATH", DEFAULT_DATASET))
@@ -459,6 +459,18 @@ class ModelService:
                 self.iso_decision_max = float(meta.get("iso_decision_max", self.iso_decision_max))
             except Exception as exc:  # noqa: BLE001
                 LOGGER.warning("Failed to parse meta.json: %s", exc)
+        else:
+            # meta.json이 없을 때는 학습 데이터 기반으로 IsolationForest 점수 스팬을 다시 계산한다.
+            self._recompute_iso_span_from_dataset()
+
+        # 환경변수로 threshold를 강제 오버라이드할 수 있게 한다(실험/운영 튜닝용).
+        env_thresh = os.getenv("ANOMALY_THRESHOLD")
+        if env_thresh is not None:
+            try:
+                self.threshold = float(env_thresh)
+                LOGGER.info("Threshold overridden by ANOMALY_THRESHOLD=%s", env_thresh)
+            except ValueError:
+                LOGGER.warning("Invalid ANOMALY_THRESHOLD value: %s (ignoring)", env_thresh)
 
         if self.paths.rf_model.exists():
             try:
@@ -754,3 +766,74 @@ class ModelService:
         except Exception:  # noqa: BLE001
             LOGGER.warning("Ignoring invalid UUID value: %s", value)
             return None
+
+    # ---------------------------------------------------
+    # Recovery helpers
+    # ---------------------------------------------------
+    def _recompute_iso_span_from_dataset(self) -> None:
+        """Recompute IsolationForest decision score span when meta.json is missing."""
+        if not all([self.enc_src_ip, self.enc_dst_ip, self.enc_proto, self.scaler, self.iso_model]):
+            LOGGER.warning("Cannot recompute ISO span: required artifacts not loaded.")
+            return
+
+        dataset_path = self.dataset_path
+        if not dataset_path or not Path(dataset_path).exists():
+            LOGGER.warning("Cannot recompute ISO span: dataset %s not found.", dataset_path)
+            return
+
+        try:
+            df = pd.read_csv(dataset_path)
+            atk_path = self.attacker_dataset_path
+            if atk_path:
+                atk_path = Path(atk_path)
+                if not atk_path.exists() and atk_path.name == "attacker.csv":
+                    fallback = atk_path.with_name("attaker.csv")
+                    if fallback.exists():
+                        LOGGER.warning("Attacker dataset %s not found. Falling back to %s", atk_path, fallback)
+                        atk_path = fallback
+                if atk_path.exists():
+                    atk_df = pd.read_csv(atk_path).copy()
+                    atk_df["label"] = 1
+                    df = pd.concat([df, atk_df], ignore_index=True)
+                else:
+                    LOGGER.warning("Attacker dataset %s not found during ISO span recompute.", atk_path)
+
+            needed = self.base_feature_columns
+            missing = [c for c in needed if c not in df.columns]
+            if missing:
+                LOGGER.warning("Cannot recompute ISO span: dataset missing columns %s", ", ".join(missing))
+                return
+
+            df = df.dropna(subset=needed).copy()
+            df["start_time"] = pd.to_datetime(df.get("start_time"), errors="coerce")
+            df = df.sort_values("start_time").reset_index(drop=True)
+            df["proto"] = df["proto"].astype(str).str.upper()
+            df["src_port"] = df["src_port"].astype(int)
+            df["dst_port"] = df["dst_port"].astype(int)
+            df["packet_count"] = df["packet_count"].astype(int)
+            df["byte_count"] = df["byte_count"].astype(int)
+            df["duration"] = df["duration"].astype(float)
+            df["pps"] = df["pps"].astype(float)
+            df["bps"] = df["bps"].astype(float)
+
+            df = self._inject_rate_deltas(df)
+            df["pps"] = np.log1p(df["pps"])
+            df["bps"] = np.log1p(df["bps"])
+
+            df["src_ip"] = [self._safe_label_encode(self.enc_src_ip, v) for v in df["src_ip"].astype(str)]
+            df["dst_ip"] = [self._safe_label_encode(self.enc_dst_ip, v) for v in df["dst_ip"].astype(str)]
+            df["proto"] = [self._safe_label_encode(self.enc_proto, v) for v in df["proto"].astype(str)]
+
+            scaled = self.scaler.transform(df[self.feature_columns])
+            iso_scores = self.iso_model.decision_function(scaled)
+            self.iso_decision_min = float(np.min(iso_scores))
+            self.iso_decision_max = float(np.max(iso_scores))
+            if self.iso_decision_max - self.iso_decision_min <= 1e-9:
+                self.iso_decision_max = self.iso_decision_min + 1e-6
+            LOGGER.info(
+                "Recomputed ISO span from dataset: [%.6f, %.6f]",
+                self.iso_decision_min,
+                self.iso_decision_max,
+            )
+        except Exception as exc:  # noqa: BLE001
+            LOGGER.warning("Failed to recompute ISO span from dataset: %s", exc)
