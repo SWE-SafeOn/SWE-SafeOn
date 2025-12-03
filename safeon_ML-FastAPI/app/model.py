@@ -158,7 +158,7 @@ class ModelService:
         attacker_dataset_path: Optional[Path] = DEFAULT_ATTACKER_DATASET,
         database_url: Optional[str] = DEFAULT_DB_URL,
         allow_dummy: bool = True,
-        threshold: float = 0.74,
+        threshold: float = 0.58,
     ) -> None:
         self.model_dir = Path(model_dir)
         self.dataset_path = Path(dataset_path)
@@ -199,7 +199,7 @@ class ModelService:
     @classmethod
     def from_env(cls) -> "ModelService":
         allow_dummy = os.getenv("ALLOW_DUMMY", "true").lower() != "false"
-        threshold = float(os.getenv("ANOMALY_THRESHOLD", "0.74"))
+        threshold = float(os.getenv("ANOMALY_THRESHOLD", "0.58"))
 
         model_dir = Path(os.getenv("MODEL_DIR", DEFAULT_MODEL_DIR))
         dataset_path = Path(os.getenv("DATASET_PATH", DEFAULT_DATASET))
@@ -307,6 +307,8 @@ class ModelService:
         encoded["flow_key"] = df["flow_key"].values
         encoded["start_time"] = df["start_time"].values
         encoded["label"] = df["label"].values
+        # 후속 스케일링 결과를 안전하게 덮어쓸 수 있도록 float으로 맞춰 dtype 경고를 방지한다.
+        encoded[self.feature_columns] = encoded[self.feature_columns].astype(float)
 
         normal_mask = df["label"].astype(int) == 0
         if not normal_mask.any():
@@ -405,6 +407,17 @@ class ModelService:
             packet_meta_id=self._coerce_uuid(packet_meta_id),
         )
 
+        if LOGGER.isEnabledFor(logging.DEBUG):
+            LOGGER.debug(
+                "Inference: iso=%.4f rf=%s hybrid=%.4f thresh=%.4f is_anom=%s record_id=%s",
+                iso_score,
+                "None" if rf_score is None else f"{rf_score:.4f}",
+                hybrid_score,
+                self.threshold,
+                is_anom,
+                record_id,
+            )
+
         return {
             "is_anom": is_anom,
             "iso_score": iso_score,
@@ -457,7 +470,15 @@ class ModelService:
             self.rf_model = None
 
         self.prev_flow_stats.clear()
-        self.model_loaded = all([self.iso_model, self.rf_model])
+        # 모델 로딩 여부는 IsolationForest 중심으로 판단하고, RF는 선택적으로 사용한다.
+        self.model_loaded = self.iso_model is not None
+        LOGGER.info(
+            "Artifacts loaded. Threshold=%.3f, ISO span=[%.6f, %.6f], RF loaded=%s",
+            self.threshold,
+            self.iso_decision_min,
+            self.iso_decision_max,
+            self.rf_model is not None,
+        )
 
     def _safe_label_encode(self, encoder: LabelEncoder, value: str) -> int:
         classes = set(encoder.classes_.tolist())
@@ -573,10 +594,74 @@ class ModelService:
             LOGGER.warning("RandomForest prediction failed: %s", exc)
             return None
         
-    def _calculate_threshold(self, features: np.ndarray, labels: np.ndarray) -> float:  # noqa: ARG002
-        """Use the configured static threshold (default 0.74)."""
-        LOGGER.info("Using fixed anomaly threshold: %.2f", self.threshold)
-        return self.threshold
+    def _rf_scores(self, scaled_matrix: np.ndarray) -> List[Optional[float]]:
+        if self.rf_model is None:
+            return [None for _ in range(len(scaled_matrix))]
+        try:
+            probs = self.rf_model.predict_proba(scaled_matrix)[:, 1]
+            return [float(p) for p in probs]
+        except Exception as exc:  # noqa: BLE001
+            LOGGER.warning("RandomForest batch prediction failed: %s", exc)
+            return [None for _ in range(len(scaled_matrix))]
+
+    def _iso_scores(self, scaled_matrix: np.ndarray) -> np.ndarray:
+        if self.iso_model is None:
+            return np.zeros(len(scaled_matrix), dtype=float)
+        raw = self.iso_model.decision_function(scaled_matrix)
+        span = self.iso_decision_max - self.iso_decision_min
+        if span <= 1e-9:
+            return np.clip(-raw, 0.0, 1.0)
+        scores = (self.iso_decision_max - raw) / span
+        return np.clip(scores, 0.0, 1.0)
+
+    def _hybrid_scores(self, scaled_matrix: np.ndarray) -> np.ndarray:
+        iso_scores = self._iso_scores(scaled_matrix)
+        rf_scores = self._rf_scores(scaled_matrix)
+        hybrid = []
+        for iso, rf in zip(iso_scores, rf_scores):
+            rf_contrib = 0.5 if rf is None else float(max(0.0, min(1.0, rf)))
+            hybrid.append(float((iso + rf_contrib) / 2.0))
+        return np.asarray(hybrid, dtype=float)
+
+    def _calculate_threshold(self, features: np.ndarray, labels: np.ndarray) -> float:
+        """Find a threshold that maximizes F1 on labeled data; fallback to configured default."""
+        if features.size == 0 or labels.size == 0:
+            LOGGER.info("No data provided for threshold search. Using configured value %.2f", self.threshold)
+            return self.threshold
+
+        labels_int = labels.astype(int)
+        unique_labels = np.unique(labels_int)
+        if unique_labels.size < 2:
+            LOGGER.info("Only one class present. Using configured threshold %.2f", self.threshold)
+            return self.threshold
+
+        hybrid_scores = self._hybrid_scores(features)
+        candidates = np.linspace(0.10, 0.99, 90)
+
+        best_thresh = self.threshold
+        best_f1 = -1.0
+        for thresh in candidates:
+            preds = hybrid_scores >= thresh
+            tp = float(np.sum((preds == 1) & (labels_int == 1)))
+            fp = float(np.sum((preds == 1) & (labels_int == 0)))
+            fn = float(np.sum((preds == 0) & (labels_int == 1)))
+
+            precision = tp / (tp + fp + 1e-9)
+            recall = tp / (tp + fn + 1e-9)
+            f1 = 2 * precision * recall / (precision + recall + 1e-9)
+
+            if f1 > best_f1:
+                best_f1 = f1
+                best_thresh = float(thresh)
+
+        LOGGER.info(
+            "Selected threshold %.3f maximizing F1=%.4f over %d candidates (default was %.2f)",
+            best_thresh,
+            best_f1,
+            len(candidates),
+            self.threshold,
+        )
+        return best_thresh
 
     def _inject_rate_deltas(self, df: pd.DataFrame) -> pd.DataFrame:
         working = df.copy()

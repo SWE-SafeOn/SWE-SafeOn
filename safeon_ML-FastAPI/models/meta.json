@@ -15,7 +15,7 @@
     "pps_cum_increase",
     "bps_cum_increase"
   ],
-  "threshold": 0.7740415847798234,
+  "threshold": 0.58,
   "iso_decision_min": -0.10999619781275871,
   "iso_decision_max": 0.2802398785860044
 }
