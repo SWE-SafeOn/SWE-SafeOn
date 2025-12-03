@@ -853,13 +853,28 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
                     showTitles: true,
                     interval: bottomInterval,
                     reservedSize: 30.0,
-                    getTitlesWidget: (value, _) => Padding(
-                      padding: const EdgeInsets.only(top: 6),
-                      child: Text(
-                        formatTs(value),
-                        style: const TextStyle(fontSize: 11, color: SafeOnColors.textSecondary),
-                      ),
-                    ),
+                    getTitlesWidget: (value, meta) {
+                      const tolerance = 0.001;
+                      if ((value - meta.min).abs() <= tolerance) {
+                        return const Padding(
+                          padding: EdgeInsets.only(top: 6),
+                          child: Text(
+                            '시작',
+                            style: TextStyle(fontSize: 11, color: SafeOnColors.textSecondary),
+                          ),
+                        );
+                      }
+                      if ((value - meta.max).abs() <= tolerance) {
+                        return const Padding(
+                          padding: EdgeInsets.only(top: 6),
+                          child: Text(
+                            '끝',
+                            style: TextStyle(fontSize: 11, color: SafeOnColors.textSecondary),
+                          ),
+                        );
+                      }
+                      return const SizedBox.shrink();
+                    },
                   ),
                 ),
               ),
