@@ -397,15 +397,7 @@ class ModelService:
         rf_contrib = float(max(0.0, min(1.0, rf_contrib)))
         hybrid_score = float((iso_score + rf_contrib) / 2.0)
         is_anom = hybrid_score >= self.threshold
-        record_id = self._persist_score(
-            ts=ts,
-            iso_score=iso_score,
-            rf_score=rf_score,
-            hybrid_score=hybrid_score,
-            is_anom=is_anom,
-            user_id=user_id,
-            packet_meta_id=self._coerce_uuid(packet_meta_id),
-        )
+        record_id = None
 
         if LOGGER.isEnabledFor(logging.DEBUG):
             LOGGER.debug(
