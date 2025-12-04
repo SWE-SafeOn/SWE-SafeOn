@@ -17,6 +17,7 @@ import '../widgets/alert_tile.dart';
 import '../widgets/device_card.dart';
 import '../widgets/section_header.dart';
 import '../widgets/security_graph_card.dart';
+import 'alert_detail_screen.dart';
 import 'profile_edit_screen.dart';
 import 'device_detail_screen.dart';
 
@@ -229,6 +230,21 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return fetchedAlerts
         .where((alert) => !_knownAlertIds.contains(alert.id))
         .toList();
+  }
+
+  Future<void> _handleAlertTap(SafeOnAlert alert) async {
+    unawaited(_acknowledgeAlert(alert));
+    if (!mounted) return;
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => AlertDetailScreen(
+          alertId: alert.id,
+          apiClient: widget.apiClient,
+          token: widget.session.token,
+          initialAlert: alert,
+        ),
+      ),
+    );
   }
 
   Future<void> _acknowledgeAlert(SafeOnAlert alert) async {
@@ -644,7 +660,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     padding: const EdgeInsets.only(bottom: 10),
                     child: AlertTile(
                       alert: alert,
-                      onTap: () => _acknowledgeAlert(alert),
+                      onTap: () => _handleAlertTap(alert),
                       isAcknowledging:
                           _acknowledgingAlertIds.contains(alert.id),
                     ),
@@ -674,7 +690,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       itemCount: _alerts.length,
       itemBuilder: (context, index) => AlertTile(
         alert: _alerts[index],
-        onTap: () => _acknowledgeAlert(_alerts[index]),
+        onTap: () => _handleAlertTap(_alerts[index]),
         isAcknowledging:
             _acknowledgingAlertIds.contains(_alerts[index].id),
       ),

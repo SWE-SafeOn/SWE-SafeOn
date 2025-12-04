@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:intl/date_symbol_data_local.dart';
+import 'package:intl/intl.dart';
 
 import 'models/user_profile.dart';
 import 'models/user_session.dart';
@@ -11,6 +13,8 @@ import 'theme/app_theme.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await initializeDateFormatting('ko');
+  Intl.defaultLocale = 'ko';
   await NotificationService.initialize();
   runApp(const SafeOnApp());
 }
@@ -23,7 +27,9 @@ class SafeOnApp extends StatefulWidget {
 }
 
 class _SafeOnAppState extends State<SafeOnApp> {
-  final SafeOnApiClient _apiClient = SafeOnApiClient();
+  // BASE_URL can be provided via --dart-define=BASE_URL=http://<host>:8080
+  final SafeOnApiClient _apiClient =
+      SafeOnApiClient(baseUrl: const String.fromEnvironment('BASE_URL'));
   bool _completedOnboarding = false;
   UserSession? _session;
   String _cachedEmail = 'Godten@example.com';

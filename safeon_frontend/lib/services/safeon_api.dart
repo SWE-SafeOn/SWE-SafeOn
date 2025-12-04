@@ -358,6 +358,26 @@ class SafeOnApiClient {
     );
   }
 
+  Future<SafeOnAlert> fetchAlertDetail({
+    required String token,
+    required String alertId,
+  }) async {
+    final response = await _httpClient.get(
+      _uri('/alerts/$alertId'),
+      headers: _jsonHeaders(token: token),
+    );
+
+    final body = _decode(response);
+    if (response.statusCode == 200 && body['data'] != null) {
+      return SafeOnAlert.fromJson(body['data'] as Map<String, dynamic>);
+    }
+
+    throw ApiException(
+      _extractError(body) ?? '알림 상세를 불러올 수 없습니다.',
+      response.statusCode,
+    );
+  }
+
   Future<void> acknowledgeAlert({
     required String token,
     required String alertId,
