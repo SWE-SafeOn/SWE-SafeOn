@@ -85,22 +85,6 @@ SELECT create_hypertable('anomaly_scores', 'ts', if_not_exists => TRUE);
 
 
 -- ===========================================
--- TWIN_RESIDUALS (HyperTable)
--- ===========================================
-CREATE TABLE twin_residuals (
-    residual_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    ts TIMESTAMPTZ NOT NULL,
-    twin_ver VARCHAR(255),
-    pred DOUBLE PRECISION,
-    actual DOUBLE PRECISION,
-    residual DOUBLE PRECISION,
-    state VARCHAR(128)
-);
-
-SELECT create_hypertable('twin_residuals', 'ts', if_not_exists => TRUE);
-
-
--- ===========================================
 -- ALERTS
 -- ===========================================
 CREATE TABLE alerts (
