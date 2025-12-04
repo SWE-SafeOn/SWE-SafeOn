@@ -87,17 +87,21 @@ public class MlResultMqttListener implements MqttPacketListener {
         OffsetDateTime ts = resolveTime(payload.timestamp());
         OffsetDateTime eventTs = ts != null ? ts : OffsetDateTime.now();
 
+        String externalIp = findExternalIp(packetMeta);
+        boolean isExternalAccess = StringUtils.hasText(externalIp);
+        boolean isAnomaly = Boolean.TRUE.equals(payload.isAnom()) || isExternalAccess;
+
         AnomalyScore score = AnomalyScore.builder()
                 .ts(eventTs)
                 .packetMeta(payload.packetMetaId())
                 .isoScore(payload.isoScore())
                 .rfScore(payload.rfScore())
                 .hybridScore(payload.hybridScore())
-                .isAnom(Boolean.TRUE.equals(payload.isAnom()))
+                .isAnom(isAnomaly)
                 .build();
         score = anomalyScoreRepository.save(score);
 
-        if (!Boolean.TRUE.equals(payload.isAnom())) {
+        if (!isAnomaly) {
             return;
         }
 
@@ -114,12 +118,27 @@ public class MlResultMqttListener implements MqttPacketListener {
         }
 
         Device device = resolveDevice(payload.deviceId(), packetMeta);
+        String alertReason = StringUtils.hasText(payload.reason()) ? payload.reason() : DEFAULT_REASON;
+        String alertEvidence = payload.evidence();
+
+        if (isExternalAccess) {
+            alertReason = "외부 접근 감지";
+            alertEvidence = String.format(
+                    "{\"message\":\"외부 IP(%s)가 접근했습니다.\",\"srcIp\":\"%s\",\"dstIp\":\"%s\"}",
+                    externalIp,
+                    packetMeta.getSrcIp(),
+                    packetMeta.getDstIp()
+            );
+            log.warn("External access detected from {}. packetMetaId={}, srcIp={}, dstIp={}",
+                    externalIp, packetMeta.getPacketMetaId(), packetMeta.getSrcIp(), packetMeta.getDstIp());
+        }
+
         Alert alert = Alert.builder()
                 .ts(eventTs)
                 .device(device)
                 .severity(StringUtils.hasText(payload.severity()) ? payload.severity() : DEFAULT_SEVERITY)
-                .reason(StringUtils.hasText(payload.reason()) ? payload.reason() : DEFAULT_REASON)
-                .evidence(payload.evidence())
+                .reason(alertReason)
+                .evidence(alertEvidence)
                 .status(DEFAULT_STATUS)
                 .build();
         Alert savedAlert = alertRepository.save(alert);
@@ -212,5 +231,22 @@ public class MlResultMqttListener implements MqttPacketListener {
             @JsonAlias({"evidence"}) String evidence,
             @JsonAlias({"ts", "timestamp"}) String timestamp
     ) {
+    }
+
+    private String findExternalIp(PacketMeta packetMeta) {
+        String src = packetMeta.getSrcIp();
+        if (StringUtils.hasText(src) && !isInternalIp(src)) {
+            return src;
+        }
+
+        String dst = packetMeta.getDstIp();
+        if (StringUtils.hasText(dst) && !isInternalIp(dst)) {
+            return dst;
+        }
+        return null;
+    }
+
+    private boolean isInternalIp(String ip) {
+        return ip.startsWith("192.168.");
     }
 }
