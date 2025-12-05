@@ -3,6 +3,10 @@
 
 ---
 
+![safeon.png](docs/safeon.png)
+
+---
+
 ## Project Proposal
 The Internet of Things (IoT) has rapidly transformed modern homes into highly connected environments, integrating devices such as cameras, smart locks, vacuum robots, and household appliances.
 
