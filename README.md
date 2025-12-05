@@ -3,7 +3,7 @@
 
 ---
 
-![safeon](docs/safeOn.png)
+![safeon](docs/SafeOn.png)
 
 ---
 
