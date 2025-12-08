@@ -118,7 +118,6 @@ class FlowFeatures(BaseModel):
 class ArtifactPaths:
     enc_src_ip: Path
     enc_dst_ip: Path
-    enc_proto: Path
     scaler: Path
     isolation_forest: Path
     meta: Path
@@ -134,19 +133,12 @@ class ModelService:
     base_feature_columns = [
         "src_ip",
         "dst_ip",
-        "src_port",
-        "dst_port",
-        "proto",
         "packet_count",
         "byte_count",
-        "duration",
-        "pps",
         "bps",
     ]
     feature_columns = base_feature_columns + [
-        "pps_delta",
         "bps_delta",
-        "pps_cum_increase",
         "bps_cum_increase",
     ]
     # delta 특성을 포함해 정적 값 + 변화량을 동시에 학습한다.
@@ -170,7 +162,6 @@ class ModelService:
         self.paths = ArtifactPaths(
             enc_src_ip=self.model_dir / "enc_src_ip.pkl",
             enc_dst_ip=self.model_dir / "enc_dst_ip.pkl",
-            enc_proto=self.model_dir / "enc_proto.pkl",
             scaler=self.model_dir / "scaler.pkl",
             isolation_forest=self.model_dir / "isolation_forest.pkl",
             meta=self.model_dir / "meta.json",
@@ -179,7 +170,6 @@ class ModelService:
 
         self.enc_src_ip: Optional[LabelEncoder] = None
         self.enc_dst_ip: Optional[LabelEncoder] = None
-        self.enc_proto: Optional[LabelEncoder] = None
         self.scaler: Optional[MinMaxScaler] = None
         self.iso_model: Optional[IsolationForest] = None
         self.rf_model: Optional[RandomForestClassifier] = None
@@ -249,7 +239,8 @@ class ModelService:
             else:
                 LOGGER.warning("Attacker dataset path %s does not exist. Skipping attacker samples.", attacker_path)
 
-        missing = [c for c in self.base_feature_columns + ["label"] if c not in df.columns]
+        required_columns = self.base_feature_columns + ["label", "src_port", "dst_port", "proto", "pps"]
+        missing = [c for c in required_columns if c not in df.columns]
         if missing:
             raise ValueError(f"Dataset is missing required columns: {', '.join(missing)}")
 
@@ -261,7 +252,6 @@ class ModelService:
         df["dst_port"] = df["dst_port"].astype(int)
         df["packet_count"] = df["packet_count"].astype(int)
         df["byte_count"] = df["byte_count"].astype(int)
-        df["duration"] = df["duration"].astype(float)
         df["pps"] = df["pps"].astype(float)
         df["bps"] = df["bps"].astype(float)
         df["label"] = df["label"].astype(int)
@@ -284,23 +274,15 @@ class ModelService:
         # 문자열 기반 특성은 라벨 인코더로 숫자형으로 치환한다.
         self.enc_src_ip = LabelEncoder().fit(df["src_ip"])
         self.enc_dst_ip = LabelEncoder().fit(df["dst_ip"])
-        self.enc_proto = LabelEncoder().fit(df["proto"])
 
         encoded = pd.DataFrame(
             {
                 "src_ip": self.enc_src_ip.transform(df["src_ip"]),
                 "dst_ip": self.enc_dst_ip.transform(df["dst_ip"]),
-                "src_port": df["src_port"].astype(int),
-                "dst_port": df["dst_port"].astype(int),
-                "proto": self.enc_proto.transform(df["proto"]),
                 "packet_count": df["packet_count"].astype(int),
                 "byte_count": df["byte_count"].astype(int),
-                "duration": df["duration"].astype(float),
-                "pps": df["pps"].astype(float),
                 "bps": df["bps"].astype(float),
-                "pps_delta": df["pps_delta"].astype(float),
                 "bps_delta": df["bps_delta"].astype(float),
-                "pps_cum_increase": df["pps_cum_increase"].astype(float),
                 "bps_cum_increase": df["bps_cum_increase"].astype(float),
             }
         )
@@ -323,7 +305,6 @@ class ModelService:
 
         joblib.dump(self.enc_src_ip, self.paths.enc_src_ip)
         joblib.dump(self.enc_dst_ip, self.paths.enc_dst_ip)
-        joblib.dump(self.enc_proto, self.paths.enc_proto)
         joblib.dump(self.scaler, self.paths.scaler)
 
         LOGGER.info("Training IsolationForest on normal samples only")
@@ -424,7 +405,6 @@ class ModelService:
         required = [
             self.paths.enc_src_ip,
             self.paths.enc_dst_ip,
-            self.paths.enc_proto,
             self.paths.scaler,
             self.paths.isolation_forest,
         ]
@@ -439,7 +419,6 @@ class ModelService:
         LOGGER.info("Loading model artifacts from %s", self.model_dir)
         self.enc_src_ip = joblib.load(self.paths.enc_src_ip)
         self.enc_dst_ip = joblib.load(self.paths.enc_dst_ip)
-        self.enc_proto = joblib.load(self.paths.enc_proto)
         self.scaler = joblib.load(self.paths.scaler)
         self.iso_model = joblib.load(self.paths.isolation_forest)
 
@@ -541,39 +520,32 @@ class ModelService:
         return delta_pps, delta_bps, pps_cum, bps_cum
 
     def _transform_flow(self, flow: FlowFeatures) -> np.ndarray:
-        if not all([self.enc_src_ip, self.enc_dst_ip, self.enc_proto, self.scaler]):
+        if not all([self.enc_src_ip, self.enc_dst_ip, self.scaler]):
             raise RuntimeError("Model artifacts are not loaded.")
 
         df = flow.as_frame(self.feature_columns)
         df["src_ip"] = df["src_ip"].astype(str)
         df["dst_ip"] = df["dst_ip"].astype(str)
-        df["proto"] = df["proto"].astype(str).str.upper()
-        df["src_port"] = df["src_port"].astype(int)
-        df["dst_port"] = df["dst_port"].astype(int)
         df["packet_count"] = df["packet_count"].astype(int)
         df["byte_count"] = df["byte_count"].astype(int)
-        df["duration"] = df["duration"].astype(float)
-        df["pps"] = df["pps"].astype(float)
         df["bps"] = df["bps"].astype(float)
 
         # 추론 시점의 delta 값을 보정해 정규화 파이프라인에 맞춘다.
+        current_pps = float(flow.pps)
+        current_bps = float(df.at[0, "bps"])
         (
-            pps_delta,
+            _,
             bps_delta,
-            pps_cum_increase,
+            _,
             bps_cum_increase,
-        ) = self._resolve_flow_deltas(flow, float(df.at[0, "pps"]), float(df.at[0, "bps"]))
-        df.loc[:, "pps_delta"] = pps_delta
+        ) = self._resolve_flow_deltas(flow, current_pps, current_bps)
         df.loc[:, "bps_delta"] = bps_delta
-        df.loc[:, "pps_cum_increase"] = pps_cum_increase
         df.loc[:, "bps_cum_increase"] = bps_cum_increase
 
-        df["pps"] = np.log1p(df["pps"])
         df["bps"] = np.log1p(df["bps"])
 
         df["src_ip"] = [self._safe_label_encode(self.enc_src_ip, ip) for ip in df["src_ip"]]
         df["dst_ip"] = [self._safe_label_encode(self.enc_dst_ip, ip) for ip in df["dst_ip"]]
-        df["proto"] = [self._safe_label_encode(self.enc_proto, p) for p in df["proto"]]
 
         scaled = self.scaler.transform(df[self.feature_columns])
         return scaled[0]
@@ -764,7 +736,7 @@ class ModelService:
     # ---------------------------------------------------
     def _recompute_iso_span_from_dataset(self) -> None:
         """Recompute IsolationForest decision score span when meta.json is missing."""
-        if not all([self.enc_src_ip, self.enc_dst_ip, self.enc_proto, self.scaler, self.iso_model]):
+        if not all([self.enc_src_ip, self.enc_dst_ip, self.scaler, self.iso_model]):
             LOGGER.warning("Cannot recompute ISO span: required artifacts not loaded.")
             return
 
@@ -790,7 +762,7 @@ class ModelService:
                 else:
                     LOGGER.warning("Attacker dataset %s not found during ISO span recompute.", atk_path)
 
-            needed = self.base_feature_columns
+            needed = self.base_feature_columns + ["src_port", "dst_port", "proto", "pps"]
             missing = [c for c in needed if c not in df.columns]
             if missing:
                 LOGGER.warning("Cannot recompute ISO span: dataset missing columns %s", ", ".join(missing))
@@ -804,7 +776,6 @@ class ModelService:
             df["dst_port"] = df["dst_port"].astype(int)
             df["packet_count"] = df["packet_count"].astype(int)
             df["byte_count"] = df["byte_count"].astype(int)
-            df["duration"] = df["duration"].astype(float)
             df["pps"] = df["pps"].astype(float)
             df["bps"] = df["bps"].astype(float)
 
@@ -814,7 +785,6 @@ class ModelService:
 
             df["src_ip"] = [self._safe_label_encode(self.enc_src_ip, v) for v in df["src_ip"].astype(str)]
             df["dst_ip"] = [self._safe_label_encode(self.enc_dst_ip, v) for v in df["dst_ip"].astype(str)]
-            df["proto"] = [self._safe_label_encode(self.enc_proto, v) for v in df["proto"].astype(str)]
 
             scaled = self.scaler.transform(df[self.feature_columns])
             iso_scores = self.iso_model.decision_function(scaled)
