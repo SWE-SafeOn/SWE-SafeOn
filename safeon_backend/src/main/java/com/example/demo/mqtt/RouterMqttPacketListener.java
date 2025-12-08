@@ -1,10 +1,18 @@
 package com.example.demo.mqtt;
 
 import com.example.demo.config.RouterMqttProperties;
+import com.example.demo.domain.Alert;
+import com.example.demo.domain.AnomalyScore;
 import com.example.demo.domain.Device;
 import com.example.demo.domain.PacketMeta;
+import com.example.demo.domain.UserAlert;
+import com.example.demo.repository.AlertRepository;
+import com.example.demo.repository.AnomalyScoreRepository;
 import com.example.demo.repository.DeviceRepository;
+import com.example.demo.repository.UserAlertRepository;
+import com.example.demo.repository.UserDeviceRepository;
 import com.example.demo.repository.PacketMetaRepository;
+import com.example.demo.service.DashboardService;
 import com.fasterxml.jackson.annotation.JsonAlias;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -30,6 +38,11 @@ public class RouterMqttPacketListener implements MqttPacketListener {
     private final RouterMqttProperties mqttProperties;
     private final DeviceRepository deviceRepository;
     private final PacketMetaRepository packetMetaRepository;
+    private final AnomalyScoreRepository anomalyScoreRepository;
+    private final AlertRepository alertRepository;
+    private final UserDeviceRepository userDeviceRepository;
+    private final UserAlertRepository userAlertRepository;
+    private final DashboardService dashboardService;
     private final MlRequestPublisher mlRequestPublisher;
     private final ObjectMapper objectMapper;
 
@@ -37,17 +50,17 @@ public class RouterMqttPacketListener implements MqttPacketListener {
     @Transactional
     public void onPacketReceived(String topic, byte[] payload) {
         String message = new String(payload, StandardCharsets.UTF_8);
-        log.info("MQTT message received. topic={}, payload={}", topic, message);
+        log.info("MQTT 메시지 수신. topic={}, payload={}", topic, message);
         try {
             if (matches(topic, mqttProperties.getDeviceTopic())) {
                 handleDeviceDiscovery(message);
             } else if (matches(topic, mqttProperties.getFlowTopic())) {
                 handleFlowPackets(message);
             } else {
-                log.debug("MQTT message ignored. topic={}", topic);
+                log.debug("처리 대상이 아닌 MQTT 메시지입니다. topic={}", topic);
             }
         } catch (Exception e) {
-            log.warn("Failed to process MQTT message. topic={}, payload={}", topic, message, e);
+            log.warn("MQTT 메시지 처리에 실패했습니다. topic={}, payload={}", topic, message, e);
         }
     }
 
@@ -58,7 +71,7 @@ public class RouterMqttPacketListener implements MqttPacketListener {
     private void handleDeviceDiscovery(String message) throws Exception {
         DeviceDiscoveryPayload payload = objectMapper.readValue(message, DeviceDiscoveryPayload.class);
         if (!StringUtils.hasText(payload.macAddress())) {
-            throw new IllegalArgumentException("macAddress is required for discovered device.");
+            throw new IllegalArgumentException("macAddress는 필수 값입니다.");
         }
 
         String status = StringUtils.hasText(payload.status()) ? payload.status() : "connect";
@@ -70,7 +83,7 @@ public class RouterMqttPacketListener implements MqttPacketListener {
                             if (StringUtils.hasText(payload.ip())) {
                                 existing.updateIp(payload.ip());
                             }
-                            log.debug("Device already exists, updated status. mac={}, status={}", payload.macAddress(), status);
+                            log.debug("이미 존재하는 디바이스여서 상태만 갱신했습니다. mac={}, status={}", payload.macAddress(), status);
                         },
                         () -> {
                             Device device = Device.create(
@@ -82,7 +95,7 @@ public class RouterMqttPacketListener implements MqttPacketListener {
                                     status
                             );
                             deviceRepository.save(device);
-                            log.info("Discovered device saved via MQTT. mac={}, ip={}, status={}", payload.macAddress(), payload.ip(), status);
+                            log.info("MQTT로 발견된 디바이스를 저장했습니다. mac={}, ip={}, status={}", payload.macAddress(), payload.ip(), status);
                         }
                 );
     }
@@ -99,7 +112,7 @@ public class RouterMqttPacketListener implements MqttPacketListener {
                 FlowPacketPayload payload = objectMapper.readValue(line, FlowPacketPayload.class);
                 OffsetDateTime start = resolveTime(payload.startTime());
                 if (start == null) {
-                    log.warn("Skip packet meta without start time. raw={}", line);
+                    log.warn("start time이 없어 packet_meta를 건너뜁니다. raw={}", line);
                     continue;
                 }
                 OffsetDateTime end = resolveTime(payload.endTime());
@@ -120,15 +133,34 @@ public class RouterMqttPacketListener implements MqttPacketListener {
                         .bps(payload.bps())
                         .build());
             } catch (Exception ex) {
-                log.warn("Failed to parse flow packet line, skipping. raw={}", line, ex);
+                log.warn("flow packet 파싱에 실패했습니다. 건너뜁니다. raw={}", line, ex);
             }
         }
 
         if (!entities.isEmpty()) {
-            packetMetaRepository.saveAll(entities);
-            log.info("Saved {} packet_meta rows from MQTT.", entities.size());
-            mlRequestPublisher.publishPacketMetaJsonl(entities);
+            List<PacketMeta> saved = packetMetaRepository.saveAll(entities);
+            log.info("MQTT에서 받은 packet_meta {}건을 저장했습니다.", saved.size());
+
+            // ML 결과가 오지 않더라도 외부 IP 접근은 즉시 이상치로 기록한다.
+            saved.forEach(this::markExternalAccessIfNeeded);
+
+            mlRequestPublisher.publishPacketMetaJsonl(saved);
         }
+    }
+
+    private void markExternalAccessIfNeeded(PacketMeta meta) {
+        String externalIp = findExternalIp(meta);
+        if (externalIp == null) {
+            return;
+        }
+        AnomalyScore score = anomalyScoreRepository.findByPacketMeta(meta.getPacketMetaId())
+                .orElseGet(() -> AnomalyScore.builder()
+                        .packetMeta(meta.getPacketMetaId())
+                        .ts(meta.getEndTime() != null ? meta.getEndTime() : meta.getStartTime())
+                        .build());
+        score.setIsAnom(true);
+        score = anomalyScoreRepository.save(score);
+        createExternalAccessAlert(meta, score, externalIp);
     }
 
     private OffsetDateTime resolveTime(String isoTime) {
@@ -144,7 +176,7 @@ public class RouterMqttPacketListener implements MqttPacketListener {
         try {
             return LocalDateTime.parse(isoTime, DateTimeFormatter.ISO_LOCAL_DATE_TIME).atOffset(ZoneOffset.UTC);
         } catch (DateTimeParseException e) {
-            log.warn("Cannot parse date time: {}", isoTime);
+            log.warn("시간 파싱에 실패했습니다: {}", isoTime);
             return null;
         }
     }
@@ -172,5 +204,100 @@ public class RouterMqttPacketListener implements MqttPacketListener {
             @JsonAlias({"pps"}) Double pps,
             @JsonAlias({"bps"}) Double bps
     ) {
+    }
+
+    private String findExternalIp(PacketMeta packetMeta) {
+        String src = packetMeta.getSrcIp();
+        if (StringUtils.hasText(src) && !isInternalIp(src)) {
+            return src;
+        }
+        String dst = packetMeta.getDstIp();
+        if (StringUtils.hasText(dst) && !isInternalIp(dst)) {
+            return dst;
+        }
+        return null;
+    }
+
+    private boolean isInternalIp(String ip) {
+        String prefix = extractPrefix(ip);
+        if (prefix == null) {
+            return false;
+        }
+        return deviceRepository.findAll().stream()
+                .map(Device::getIp)
+                .filter(StringUtils::hasText)
+                .map(this::extractPrefix)
+                .anyMatch(prefix::equals);
+    }
+
+    private String extractPrefix(String ip) {
+        if (!StringUtils.hasText(ip)) {
+            return null;
+        }
+        String[] parts = ip.split("\\.");
+        if (parts.length < 2) {
+            return null;
+        }
+        return parts[0] + "." + parts[1];
+    }
+
+    private void createExternalAccessAlert(PacketMeta meta, AnomalyScore score, String externalIp) {
+        // 이미 알림이 연결되어 있으면 중복 생성하지 않는다.
+        if (score.getAlert() != null && alertRepository.findById(score.getAlert()).isPresent()) {
+            return;
+        }
+
+        Device device = resolveDeviceByIp(meta);
+        OffsetDateTime ts = meta.getEndTime() != null ? meta.getEndTime() : meta.getStartTime();
+        String evidence = String.format(
+                "{\"message\":\"외부 IP(%s)가 접근했습니다.\",\"srcIp\":\"%s\",\"dstIp\":\"%s\"}",
+                externalIp,
+                meta.getSrcIp(),
+                meta.getDstIp()
+        );
+
+        Alert alert = Alert.builder()
+                .ts(ts != null ? ts : OffsetDateTime.now())
+                .device(device)
+                .severity("HIGH")
+                .reason("외부 접근 감지")
+                .evidence(evidence)
+                .status("NEW")
+                .build();
+        Alert savedAlert = alertRepository.save(alert);
+        savedAlert.setAnomalyScore(score);
+        alertRepository.save(savedAlert);
+        anomalyScoreRepository.save(score);
+
+        if (device != null) {
+            userDeviceRepository.findAllByDeviceDeviceId(device.getDeviceId())
+                    .forEach(userDevice -> {
+                        UserAlert userAlert = userAlertRepository.save(UserAlert.create(
+                                userDevice.getUser(),
+                                savedAlert,
+                                ts != null ? ts : OffsetDateTime.now(),
+                                false,
+                                "IN_APP",
+                                "PENDING"
+                        ));
+                        dashboardService.sendAlertToUser(userAlert);
+                    });
+        }
+    }
+
+    private Device resolveDeviceByIp(PacketMeta packetMeta) {
+        if (packetMeta == null) {
+            return null;
+        }
+        if (StringUtils.hasText(packetMeta.getSrcIp())) {
+            Device bySrc = deviceRepository.findFirstByIp(packetMeta.getSrcIp()).orElse(null);
+            if (bySrc != null) {
+                return bySrc;
+            }
+        }
+        if (StringUtils.hasText(packetMeta.getDstIp())) {
+            return deviceRepository.findFirstByIp(packetMeta.getDstIp()).orElse(null);
+        }
+        return null;
     }
 }

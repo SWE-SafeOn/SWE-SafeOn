@@ -41,4 +41,6 @@ public interface AnomalyScoreRepository extends JpaRepository<AnomalyScore, UUID
               and (:since is null or a.ts > :since)
             """)
     long countAnomaliesSince(@Param("since") OffsetDateTime since);
+
+    java.util.Optional<AnomalyScore> findByPacketMeta(UUID packetMeta);
 }
