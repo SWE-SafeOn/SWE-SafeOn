@@ -29,6 +29,7 @@ import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -161,17 +162,23 @@ public class RouterMqttPacketListener implements MqttPacketListener {
         score.setIsAnom(true);
         score = anomalyScoreRepository.save(score);
 
-        OffsetDateTime lastNormalTs = anomalyScoreRepository.findLastNormalTimestamp();
-        long consecutiveAnomalyCount = lastNormalTs != null
-                ? anomalyScoreRepository.countAnomaliesSince(lastNormalTs)
-                : anomalyScoreRepository.countByIsAnomTrue();
-        boolean alreadyNotified = lastNormalTs != null
-                ? alertRepository.existsByTsAfter(lastNormalTs)
-                : alertRepository.findLatestAlertTimestamp() != null;
+        OffsetDateTime eventTs = Optional.ofNullable(score.getTs()).orElse(OffsetDateTime.now());
+        OffsetDateTime lastNormalTs = anomalyScoreRepository.findLastNormalTimestampBefore(eventTs);
+        OffsetDateTime lastAlertTs = alertRepository.findLatestAlertTimestampBefore(eventTs);
+        OffsetDateTime baselineTs = lastNormalTs != null
+                ? lastNormalTs.plusNanos(1)
+                : OffsetDateTime.of(1970, 1, 1, 0, 0, 0, 0, ZoneOffset.UTC);
 
-        if (consecutiveAnomalyCount < 3 || alreadyNotified) {
-            log.info("외부 접근 알림 생성을 건너뜁니다. consecutiveAnomalyCount={}, alreadyNotified={}",
-                    consecutiveAnomalyCount, alreadyNotified);
+        List<AnomalyScore> recent = anomalyScoreRepository.findTop3ByIsAnomTrueAndTsBetweenOrderByTsDescScoreIdDesc(
+                baselineTs,
+                eventTs
+        );
+        boolean threeConsecutive = recent.size() >= 3;
+        boolean alreadyAlertedInRun = lastAlertTs != null && !lastAlertTs.isBefore(baselineTs);
+
+        if (!threeConsecutive || alreadyAlertedInRun) {
+            log.info("외부 접근 알림 생성을 건너뜁니다. threeConsecutive={}, alreadyAlertedInRun={}, lastNormalTs={}, lastAlertTs={}",
+                    threeConsecutive, alreadyAlertedInRun, lastNormalTs, lastAlertTs);
             return;
         }
 

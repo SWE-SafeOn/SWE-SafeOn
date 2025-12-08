@@ -107,23 +107,24 @@ public class MlResultMqttListener implements MqttPacketListener {
             return;
         }
 
-        OffsetDateTime lastNormalTs = anomalyScoreRepository.findLastNormalTimestamp();
-        OffsetDateTime lastAlertTs = alertRepository.findLatestAlertTimestamp();
+        OffsetDateTime lastNormalTs = anomalyScoreRepository.findLastNormalTimestampBefore(eventTs);
+        OffsetDateTime lastAlertTs = alertRepository.findLatestAlertTimestampBefore(eventTs);
         OffsetDateTime baselineTs = lastNormalTs != null
-                ? lastNormalTs
+                // 바로 직전 정상 이후부터만 집계해 동일 타임스탬프의 정상값을 포함하지 않는다.
+                ? lastNormalTs.plusNanos(1)
                 : OffsetDateTime.of(1970, 1, 1, 0, 0, 0, 0, ZoneOffset.UTC);
-        List<AnomalyScore> recent = anomalyScoreRepository.findTop3ByTsGreaterThanOrderByTsDescScoreIdDesc(baselineTs);
-        boolean threeConsecutive = recent.size() >= 3 && recent.stream().allMatch(s -> Boolean.TRUE.equals(s.getIsAnom()));
+        boolean alreadyAlertedInRun = lastAlertTs != null && !lastAlertTs.isBefore(baselineTs);
 
-        OffsetDateTime latestScoreTs = recent.isEmpty() ? eventTs : Optional.ofNullable(recent.get(0).getTs()).orElse(eventTs);
-        OffsetDateTime thirdScoreTs = recent.size() >= 3
-                ? Optional.ofNullable(recent.get(2).getTs()).orElse(latestScoreTs)
-                : latestScoreTs;
-        boolean alertAlreadyCoveringRun = lastAlertTs != null && !lastAlertTs.isBefore(thirdScoreTs);
+        // 정상 이후 구간에서 isAnom=true인 점수만으로 연속 3회 여부를 판단한다.
+        List<AnomalyScore> recent = anomalyScoreRepository.findTop3ByIsAnomTrueAndTsBetweenOrderByTsDescScoreIdDesc(
+                baselineTs,
+                eventTs
+        );
+        boolean threeConsecutive = recent.size() >= 3;
 
-        if (!threeConsecutive || alertAlreadyCoveringRun) {
-            log.info("알림 생성을 건너뜁니다. threeConsecutive={}, alertAlreadyCoveringRun={}, lastNormalTs={}, lastAlertTs={}",
-                    threeConsecutive, alertAlreadyCoveringRun, lastNormalTs, lastAlertTs);
+        if (!threeConsecutive || alreadyAlertedInRun) {
+            log.info("알림 생성을 건너뜁니다. threeConsecutive={}, alreadyAlertedInRun={}, lastNormalTs={}, lastAlertTs={}",
+                    threeConsecutive, alreadyAlertedInRun, lastNormalTs, lastAlertTs);
             return;
         }
 

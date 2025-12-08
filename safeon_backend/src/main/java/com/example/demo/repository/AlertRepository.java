@@ -4,6 +4,7 @@ import com.example.demo.domain.Alert;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.time.OffsetDateTime;
@@ -16,8 +17,8 @@ public interface AlertRepository extends JpaRepository<Alert, UUID> {
 
     boolean existsByTsAfter(OffsetDateTime ts);
 
-    @Query("select max(a.ts) from Alert a")
-    OffsetDateTime findLatestAlertTimestamp();
+    @Query("select max(a.ts) from Alert a where a.ts <= :before")
+    OffsetDateTime findLatestAlertTimestampBefore(@Param("before") OffsetDateTime before);
 
     default Alert getByAlertId(UUID alertId) {
         return findByAlertId(alertId)

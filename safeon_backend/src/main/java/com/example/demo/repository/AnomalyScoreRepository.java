@@ -32,8 +32,8 @@ public interface AnomalyScoreRepository extends JpaRepository<AnomalyScore, UUID
             @Param("end") OffsetDateTime end
     );
 
-    @Query("select max(a.ts) from AnomalyScore a where a.isAnom = false")
-    OffsetDateTime findLastNormalTimestamp();
+    @Query("select max(a.ts) from AnomalyScore a where a.isAnom = false and a.ts <= :before")
+    OffsetDateTime findLastNormalTimestampBefore(@Param("before") OffsetDateTime before);
 
     @Query("""
             select count(a)
@@ -47,5 +47,7 @@ public interface AnomalyScoreRepository extends JpaRepository<AnomalyScore, UUID
 
     Optional<AnomalyScore> findByPacketMeta(UUID packetMeta);
 
-    List<AnomalyScore> findTop3ByTsGreaterThanOrderByTsDescScoreIdDesc(OffsetDateTime ts);
+    List<AnomalyScore> findTop3ByTsBetweenOrderByTsDescScoreIdDesc(OffsetDateTime from, OffsetDateTime to);
+
+    List<AnomalyScore> findTop3ByIsAnomTrueAndTsBetweenOrderByTsDescScoreIdDesc(OffsetDateTime from, OffsetDateTime to);
 }
