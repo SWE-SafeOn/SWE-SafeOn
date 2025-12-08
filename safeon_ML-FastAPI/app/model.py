@@ -151,6 +151,7 @@ class ModelService:
         database_url: Optional[str] = DEFAULT_DB_URL,
         allow_dummy: bool = True,
         threshold: float = 0.51,
+        threshold_delta: float = 0.0,
     ) -> None:
         self.model_dir = Path(model_dir)
         self.dataset_path = Path(dataset_path)
@@ -158,6 +159,7 @@ class ModelService:
         self.database_url = database_url
         self.allow_dummy = allow_dummy
         self.threshold = threshold
+        self.threshold_delta = threshold_delta
 
         self.paths = ArtifactPaths(
             enc_src_ip=self.model_dir / "enc_src_ip.pkl",
@@ -190,6 +192,11 @@ class ModelService:
     def from_env(cls) -> "ModelService":
         allow_dummy = os.getenv("ALLOW_DUMMY", "true").lower() != "false"
         threshold = float(os.getenv("ANOMALY_THRESHOLD", "0.51"))
+        try:
+            threshold_delta = float(os.getenv("ANOMALY_THRESHOLD_DELTA", "0.0"))
+        except ValueError:
+            threshold_delta = 0.0
+            LOGGER.warning("Invalid ANOMALY_THRESHOLD_DELTA value; defaulting to 0.0.")
 
         model_dir = Path(os.getenv("MODEL_DIR", DEFAULT_MODEL_DIR))
         dataset_path = Path(os.getenv("DATASET_PATH", DEFAULT_DATASET))
@@ -203,6 +210,7 @@ class ModelService:
             database_url=database_url,
             allow_dummy=allow_dummy,
             threshold=threshold,
+            threshold_delta=threshold_delta,
         )
 
     # ---------------------------------------------------
@@ -442,6 +450,15 @@ class ModelService:
                 LOGGER.info("Threshold overridden by ANOMALY_THRESHOLD=%s", env_thresh)
             except ValueError:
                 LOGGER.warning("Invalid ANOMALY_THRESHOLD value: %s (ignoring)", env_thresh)
+
+        if abs(self.threshold_delta) > 0.0:
+            adjusted = float(max(0.0, min(1.0, self.threshold + self.threshold_delta)))
+            LOGGER.info(
+                "Threshold adjusted by delta %.3f -> %.3f (clamped to [0,1])",
+                self.threshold_delta,
+                adjusted,
+            )
+            self.threshold = adjusted
 
         if self.paths.rf_model.exists():
             try:

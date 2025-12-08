@@ -46,4 +46,6 @@ public interface AnomalyScoreRepository extends JpaRepository<AnomalyScore, UUID
     long countByIsAnomTrue();
 
     Optional<AnomalyScore> findByPacketMeta(UUID packetMeta);
+
+    List<AnomalyScore> findTop3ByTsGreaterThanOrderByTsDescScoreIdDesc(OffsetDateTime ts);
 }

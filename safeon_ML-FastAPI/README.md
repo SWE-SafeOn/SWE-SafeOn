@@ -34,6 +34,8 @@ safeon_ML-FastAPI/
 - `MODEL_PATH` (optional): filesystem path to a serialized model artifact. If omitted, the API stays in **dummy** mode and returns deterministic placeholder predictions so integration work can continue before the dataset/model is ready.
 - `ALLOW_DUMMY` (optional, default: `true`): when set to `false`, requests will fail with `503` if `MODEL_PATH` is not provided or cannot be loaded.
 - `DATABASE_URL` (optional): PostgreSQL URL for persisting inference scores (defaults to `postgresql://safeon:0987@localhost:5432/safeon`).
+- `ANOMALY_THRESHOLD` (optional): absolute threshold override for the hybrid score (0.0–1.0).
+- `ANOMALY_THRESHOLD_DELTA` (optional): additive offset applied after loading/meta/env threshold (e.g., `0.2` to raise 0.48 → 0.68, clamped to 0–1).
 
 The `/health` endpoint reports whether a model is loaded and whether the service is running in `model` or `dummy` mode.
 

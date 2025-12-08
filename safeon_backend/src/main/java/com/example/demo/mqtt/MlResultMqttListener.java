@@ -27,8 +27,10 @@ import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -106,16 +108,22 @@ public class MlResultMqttListener implements MqttPacketListener {
         }
 
         OffsetDateTime lastNormalTs = anomalyScoreRepository.findLastNormalTimestamp();
-        long consecutiveAnomalyCount = lastNormalTs != null
-                ? anomalyScoreRepository.countAnomaliesSince(lastNormalTs)
-                : anomalyScoreRepository.countByIsAnomTrue();
-        boolean alreadyNotified = lastNormalTs != null
-                ? alertRepository.existsByTsAfter(lastNormalTs)
-                : alertRepository.findLatestAlertTimestamp() != null;
+        OffsetDateTime lastAlertTs = alertRepository.findLatestAlertTimestamp();
+        OffsetDateTime baselineTs = lastNormalTs != null
+                ? lastNormalTs
+                : OffsetDateTime.of(1970, 1, 1, 0, 0, 0, 0, ZoneOffset.UTC);
+        List<AnomalyScore> recent = anomalyScoreRepository.findTop3ByTsGreaterThanOrderByTsDescScoreIdDesc(baselineTs);
+        boolean threeConsecutive = recent.size() >= 3 && recent.stream().allMatch(s -> Boolean.TRUE.equals(s.getIsAnom()));
 
-        if (consecutiveAnomalyCount < 3 || alreadyNotified) {
-            log.info("알림 생성을 건너뜁니다. consecutiveAnomalyCount={}, alreadyNotified={}",
-                    consecutiveAnomalyCount, alreadyNotified);
+        OffsetDateTime latestScoreTs = recent.isEmpty() ? eventTs : Optional.ofNullable(recent.get(0).getTs()).orElse(eventTs);
+        OffsetDateTime thirdScoreTs = recent.size() >= 3
+                ? Optional.ofNullable(recent.get(2).getTs()).orElse(latestScoreTs)
+                : latestScoreTs;
+        boolean alertAlreadyCoveringRun = lastAlertTs != null && !lastAlertTs.isBefore(thirdScoreTs);
+
+        if (!threeConsecutive || alertAlreadyCoveringRun) {
+            log.info("알림 생성을 건너뜁니다. threeConsecutive={}, alertAlreadyCoveringRun={}, lastNormalTs={}, lastAlertTs={}",
+                    threeConsecutive, alertAlreadyCoveringRun, lastNormalTs, lastAlertTs);
             return;
         }
 

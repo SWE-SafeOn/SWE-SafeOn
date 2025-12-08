@@ -8,7 +8,7 @@
     "bps_delta",
     "bps_cum_increase"
   ],
-  "threshold": 0.51,
-  "iso_decision_min": -0.12209659003774631,
+  "threshold": 0.48,
+  "iso_decision_min": -0.13857056499867337,
   "iso_decision_max": 0.2625607741672869
 }
