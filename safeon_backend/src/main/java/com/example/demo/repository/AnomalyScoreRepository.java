@@ -39,9 +39,11 @@ public interface AnomalyScoreRepository extends JpaRepository<AnomalyScore, UUID
             select count(a)
             from AnomalyScore a
             where a.isAnom = true
-              and (:since is null or a.ts > :since)
+              and a.ts > :since
             """)
     long countAnomaliesSince(@Param("since") OffsetDateTime since);
+
+    long countByIsAnomTrue();
 
     Optional<AnomalyScore> findByPacketMeta(UUID packetMeta);
 }

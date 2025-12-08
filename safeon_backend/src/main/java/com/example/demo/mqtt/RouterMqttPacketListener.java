@@ -162,7 +162,9 @@ public class RouterMqttPacketListener implements MqttPacketListener {
         score = anomalyScoreRepository.save(score);
 
         OffsetDateTime lastNormalTs = anomalyScoreRepository.findLastNormalTimestamp();
-        long consecutiveAnomalyCount = anomalyScoreRepository.countAnomaliesSince(lastNormalTs);
+        long consecutiveAnomalyCount = lastNormalTs != null
+                ? anomalyScoreRepository.countAnomaliesSince(lastNormalTs)
+                : anomalyScoreRepository.countByIsAnomTrue();
         boolean alreadyNotified = lastNormalTs != null
                 ? alertRepository.existsByTsAfter(lastNormalTs)
                 : alertRepository.findLatestAlertTimestamp() != null;
