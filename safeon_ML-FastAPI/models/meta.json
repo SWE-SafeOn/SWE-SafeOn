@@ -2,20 +2,13 @@
   "feature_columns": [
     "src_ip",
     "dst_ip",
-    "src_port",
-    "dst_port",
-    "proto",
     "packet_count",
     "byte_count",
-    "duration",
-    "pps",
     "bps",
-    "pps_delta",
     "bps_delta",
-    "pps_cum_increase",
     "bps_cum_increase"
   ],
-  "threshold": 0.58,
-  "iso_decision_min": -0.10999619781275871,
-  "iso_decision_max": 0.2802398785860044
+  "threshold": 0.51,
+  "iso_decision_min": -0.12209659003774631,
+  "iso_decision_max": 0.2625607741672869
 }

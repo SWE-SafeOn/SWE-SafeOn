@@ -14,6 +14,9 @@ public record AlertResponseDto(
         String evidence,
         String timestamp,
         String status,
+        String deviceName,
+        String deviceIp,
+        String deviceMac,
         Boolean read,
         String deliveryStatus
 ) {
@@ -32,6 +35,9 @@ public record AlertResponseDto(
                 .deviceId(alert.getDevice() != null && alert.getDevice().getDeviceId() != null
                         ? alert.getDevice().getDeviceId().toString()
                         : null)
+                .deviceName(alert.getDevice() != null ? alert.getDevice().getName() : null)
+                .deviceIp(alert.getDevice() != null ? alert.getDevice().getIp() : null)
+                .deviceMac(alert.getDevice() != null ? alert.getDevice().getMacAddress() : null)
                 .severity(alert.getSeverity())
                 .reason(alert.getReason())
                 .evidence(alert.getEvidence())

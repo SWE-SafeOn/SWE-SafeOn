@@ -1,5 +1,6 @@
 
-\documentclass[12pt, journal, onecolumn]{IEEEtran}
+\documentclass[12pt, journal]{IEEEtran}
+% \documentclass[12pt, journal, onecolumn]{IEEEtran}
 \IEEEoverridecommandlockouts
 
 % Core IEEE & Math Packages
@@ -10,11 +11,14 @@
 \usepackage{textcomp}        % Text symbols
 \usepackage{xcolor}          % Colors
 
+\usepackage{tabularx}
+\usepackage{array}
+
 % Layout and Language
 \usepackage[english]{babel}  % Hyphenation rules
 \usepackage{microtype}       % Better spacing and justification
 \setlength{\parindent}{1em}  % Paragraph indentation
-\usepackage[a4paper, margin=1.4in]{geometry} % Page margins
+% \usepackage[a4paper, margin=1.4in]{geometry} % Page margins
 
 % Tables
 \usepackage{tabularx}        % Auto-width tables
@@ -40,343 +44,439 @@
   {\small\bfseries}
   {\thesubsubsection}{1em}{}
 
-\titlespacing*{\section}
-  {0pt}{2ex plus 1ex minus .2ex}{1ex}  % before / after section
-\titlespacing*{\subsection}
-  {0pt}{1.5ex plus .5ex minus .2ex}{0.8ex}
-\titlespacing*{\subsubsection}
-  {0pt}{1ex plus .3ex minus .2ex}{0.5ex}
+% \titlespacing*{\section}
+%   {0pt}{2ex plus 1ex minus .2ex}{1ex}  % before / after section
+% \titlespacing*{\subsection}
+%   {0pt}{1.5ex plus .5ex minus .2ex}{0.8ex}
+% \titlespacing*{\subsubsection}
+%   {0pt}{1ex plus .3ex minus .2ex}{0.5ex}
+
+\titlespacing*{\section}{0pt}{1.5ex plus .3ex}{0.8ex}
+\titlespacing*{\subsection}{0pt}{1.2ex plus .2ex}{0.6ex}
+\titlespacing*{\subsubsection}{0pt}{1ex}{0.4ex}
   
 %========================================================================================
 \begin{document}
 
-\title{SafeOn: An Anomaly Detection System for Smart Home IoT Security
-  \\[0.1em] {\footnotesize \textsuperscript{*} LG SmartHome IoT Security Research Initiative}
+\title{SafeOn
+  \\[0.1em] {\large An Anomaly Detection System for Smart Home IoT Security}
 }
 
-\maketitle
 
-\begin{center}
-\begin{tabular}{cc}
-\textbf{Jaemin Jeong} & \textbf{Juseong Jeon} \\
-Hanyang University, Seoul, Korea & Hanyang University, Seoul, Korea \\
-Dept.of Information Systems & Dept.of Information Systems \\
-woals5633@hanyang.ac.kr & hyu22ix@hanyang.ac.kr \\[1em]
-\textbf{Seungmin Son} & \textbf{Wonyoung Shin} \\
-Hanyang University, Seoul, Korea & Hanyang University, Seoul, Korea \\
-Dept.of Information Systems & Dept.of Information Systems \\
-andyson0205@gmail.com & pingu090@hanyang.ac.kr \\
+\author{
+{\small
+\begin{tabular}{cccc}
+\textbf{Jaemin Jeong} & \textbf{Juseong Jeon} & \textbf{Seungmin Son} & \textbf{Wonyoung Shin} \\
+Dept.\ of Information Systems & Dept.\ of Information Systems & Dept.\ of Information Systems & Dept.\ of Information Systems \\
+Hanyang University & Hanyang University & Hanyang University & Hanyang University \\
+Seoul, Republic of Korea & Seoul, Republic of Korea & Seoul, Republic of Korea & Seoul, Republic of Korea \\
+woals5633@hanyang.ac.kr & hyu22ix@hanyang.ac.kr & andyson0205@gmail.com & pingu090@hanyang.ac.kr \\
 \end{tabular}
-\end{center}
-\vspace{2em}
+}
+}
+\maketitle
+% \author{
+% \begin{tabular}{cc}
+% \textbf{Jaemin Jeong} & \textbf{Juseong Jeon} \\
+% Hanyang University, Seoul, Korea & Hanyang University, Seoul, Korea \\
+% Dept.of Information Systems & Dept.of Information Systems \\
+% woals5633@hanyang.ac.kr & hyu22ix@hanyang.ac.kr \\[1em]
 
-\begin{abstract}
-Abstract—The Internet of Things (IoT) has come a long way with the development of home cameras, smart locks, and household appliances. Although these devices increasingly improve convenience, they also create broad attack surfaces and jeopardize the privacy of individual households. Traditional security methods are often insufficient to detect threats that manifest as unusual behavior rather than known vulnerabilities. In this work, we propose a smart home security framework based on an Endpoint Detection and Response (EDR) approach integrating multimodal data, rule-based detection, and machine learning techniques such as IsolationForest for instant anomalies and LSTM for temporal behavioral analysis. A Digital Twin simulates expected device behavior for comparative monitoring. The system provides real-time alerts, logs forensic evidence, and demonstrates a practical, privacy preserving approach to safeguarding IoT devices in everyday home environments. The framework not only provides real time alerts and proactive threat detection but also logs detailed forensic evidence to facilitate post incident analysis and accountability. Experimental evaluations demonstrate the effectiveness of the system in identifying both known and previously unseen anomalies while maintaining privacy-preserving operations suitable for deployment in everyday home environments. This work highlights a practical, scalable, and privacy-conscious approach to securing IoT devices against increasingly sophisticated cyber threats.
-\end{abstract}
+% \textbf{Seungmin Son} & \textbf{Wonyoung Shin} \\
+% Hanyang University, Seoul, Korea & Hanyang University, Seoul, Korea \\
+% Dept.of Information Systems & Dept.of Information Systems \\
+% andyson0205@gmail.com & pingu090@hanyang.ac.kr \\
+% \end{tabular}
+% }
+% \maketitle
 
-\begin{IEEEkeywords}
-Smart Home Security, IoT, Endpoint Detection and
-Response (EDR), IsolationForest, LSTM Autoencoder, Digital
-Twin, anomaly detection, privacy-preserving.
-\end{IEEEkeywords}
+% \maketitle
 
-% 표 위/아래 간격 최소화
-\setlength{\textfloatsep}{5pt}
-\setlength{\floatsep}{5pt}
-\setlength{\intextsep}{5pt}
-
-\begin{table}[H]
-\caption{Role Assignments}
-\centering
-\footnotesize
-\renewcommand{\arraystretch}{1.2}
-\setlength{\tabcolsep}{3.5pt}
-\begin{tabularx}{\columnwidth}{|p{2cm}|p{1.8cm}|X|}
-\hline
-\textbf{Roles} & \textbf{Name} & \textbf{Task Description} \\ \hline
-
-Project Manager, Security Developer & Juseong Jeon & Responsible for detecting, analyzing, and responding to anomalies in real time.approach Collaborates with AI/ML and Software Developers to embed security logic into the EDR pipeline and ensures secure communication between edge and cloud components. Supervises system integration, testing, and deployment, and maintains comprehensive project documentation. \\ \hline
-
-User/Customer, Software Developer & Jaemin Jeong & Focuses on enhancing smart home IoT experience and interaction. Builds a modular security framework and a local monitoring agent integrating packet sniffer, device monitor, and rules engine. Works with AI and Security Developers to embed anomaly detection and response logic into the EDR pipeline, designing RESTful APIs for efficient edge–cloud communication and ensuring stable, scalable operation on lightweight devices. \\ \hline
-
-User/Customer, AI/ML developer & Wonyoung Shin & Studies how AI can assist with corporate decision-making needs. As an AI developer, develops machine learning solutions to help companies make better data-driven decisions. An AI model related to LSTM and anomaly detection has been developed, and IoT security is improved through this. Focus on building AI models that analyze business data and provide clear insights for management teams. \\ \hline
-
-Project Manager, AI/ML Engineer & Seungmin Son & It is important to assign tasks, manage schedules, and ensure all requirements are met. Oversees system integration and testing, and also maintains project documentation. Next, AI/ML Engineer is responsible to pre-process IoT data and train machine learning models(Isolation Forest, LSTM). And evaluating performance and integrating the models into the digital twin simulation environment for security analysis. \\ \hline
-\end{tabularx}
-\label{tab:roles}
-\end{table}
-
+% \begin{center}
+% \begin{tabular}{cc}
+% \textbf{Jaemin Jeong} & \textbf{Juseong Jeon} \\
+% Hanyang University, Seoul, Korea & Hanyang University, Seoul, Korea \\
+% Dept.of Information Systems & Dept.of Information Systems \\
+% woals5633@hanyang.ac.kr & hyu22ix@hanyang.ac.kr \\[1em]
+% \textbf{Seungmin Son} & \textbf{Wonyoung Shin} \\
+% Hanyang University, Seoul, Korea & Hanyang University, Seoul, Korea \\
+% Dept.of Information Systems & Dept.of Information Systems \\
+% andyson0205@gmail.com & pingu090@hanyang.ac.kr \\
+% \end{tabular}
+% \end{center}
+    \vspace{2em}
+    
+    \begin{abstract}
+    The Internet of Things (IoT) has rapidly expanded into home environments through devices such as IP cameras, smart locks, and household appliances. While these devices greatly enhance convenience, they simultaneously introduce broad attack surfaces that threaten user privacy and safety. Traditional security mechanisms often fail to detect subtle or previously unseen threats that manifest as abnormal network behavior rather than identifiable vulnerabilities.
+    In this work, we present a smart home security framework adopting an Endpoint Detection and Response (EDR) approach tailored for IoT environments. The system integrates multimodal telemetry with rule-based detection and machine learning techniques—specifically Isolation Forest for real-time anomaly scoring and Random Forest for classification of suspicious flow patterns. This dual-stage detection pipeline enables fast, lightweight, and accurate identification of abnormal device activity suitable for resource-constrained edge environments.
+    The system provides real-time alerts, captures detailed forensic logs, and preserves user privacy by performing analysis at the network edge without requiring access to device internals. Experimental evaluations demonstrate the framework’s ability to identify both known and previously unseen anomalies in diverse IoT traffic patterns, maintaining high detection performance while minimizing false positives.
+    Overall, this work offers a practical, scalable, and privacy-conscious security solution for protecting everyday smart home IoT devices against increasingly sophisticated network-based threats.
+    \end{abstract}
+    
+    \begin{IEEEkeywords}
+    Smart Home Security, IoT, Endpoint Detection and
+    Response (EDR), IsolationForest, RandomForest,
+    anomaly detection, privacy-preserving.
+    \end{IEEEkeywords}
+    
+    % 표 위/아래 간격 최소화
+    \setlength{\textfloatsep}{8pt}
+    \setlength{\floatsep}{6pt}
+    \setlength{\intextsep}{6pt}
+    
+    \begin{table}[H]
+    \caption{Role Assignments}
+    \centering
+    \footnotesize
+    \renewcommand{\arraystretch}{1.2}
+    \setlength{\tabcolsep}{3.5pt}
+    % \begin{tabularx}{\columnwidth}{|p{2cm}|p{1.8cm}|X|}
+    \begin{tabularx}{\columnwidth}{|p{1.7cm}|p{1.5cm}|X|}
+    \hline
+    \textbf{Roles} & \textbf{Name} & \textbf{Task Description} \\ \hline
+    
+    Project Manager, Security Developer & Juseong Jeon & Responsible for detecting, analyzing, and responding to anomalies in real time.approach Collaborates with AI/ML and Software Developers to embed security logic into the EDR pipeline and ensures secure communication between edge and cloud components. Supervises system integration, testing, and deployment, and maintains comprehensive project documentation. \\ \hline
+    
+    User/Customer, Software Developer & Jaemin Jeong & Focuses on enhancing smart home IoT experience and interaction. Builds a modular security framework and a local monitoring agent integrating packet sniffer, device monitor, and rules engine. Works with AI and Security Developers to embed anomaly detection and response logic into the EDR pipeline, designing RESTful APIs for efficient edge–cloud communication and ensuring stable, scalable operation on lightweight devices. \\ \hline
+    
+    User/Customer, AI/ML developer & Wonyoung Shin & Studies how AI can assist with corporate decision-making needs. As an AI developer, develops machine learning solutions to help companies make better data-driven decisions. An AI model related to LSTM and anomaly detection has been developed, and IoT security is improved through this. Focus on building AI models that analyze business data and provide clear insights for management teams. \\ \hline
+    
+    Project Manager, AI/ML Engineer & Seungmin Son & It is important to assign tasks, manage schedules, and ensure all requirements are met. Oversees system integration and testing, and also maintains project documentation. Next, AI/ML Engineer is responsible to pre-process IoT data and train machine learning models(Isolation Forest, LSTM). And evaluating performance and integrating the models into the digital twin simulation environment for security analysis. \\ \hline
+    \end{tabularx}
+    \label{tab:roles}
+    \end{table}
+    
 %==========================================================================================
 
-\section{Introduction}
-\subsection{Background}
-The Internet of Things (IoT) has rapidly transformed modern homes into highly connected environments, integrating devices such as cameras, smart locks, vacuum robots, and household appliances. These smart devices improve convenience, automation, and remote control, allowing users to manage their homes through mobile apps or voice assistants. However, this hyper-connectivity also expands the attack surface, introducing significant privacy and security risks.  
-A single compromised IoT device can serve as a gateway for lateral movement across the network, allowling attackers to gain unauthorized access, conduct surveillance, or exfiltrate sensitive personal information. Unlike traditional IT assets, most consumer IoT devices are resource-constrained and lack basic protection mechanisms such as encryption, authentication, or secure firmware updates.  
+    \section{Introduction}
+    \subsection{Background}
 
-Empirical studies illustrate the magnitude of these vulnerabilities: in one of the largest global analyses, researchers scanned 16 million households and over 83 million IoT devices, uncovering that many devices remain insecure: supporting open services, weak default credentials, and outdated protocols. A complementary crowd-sourced measurement study found that a significant number of smart home devices still use weak TLS versions or advertise weak cipher suites.
-Moreover, the rise of generative AI and automated exploitation tools has lowered the barrier for cybercriminals to launch complex, adaptive attacks targeting smart home environments.  
-Therefore, there is a pressing need for an intelligent self-learning defense framework capable of analyzing device behavior directly at the edge - without relying solely on centralized cloud monitoring or static signatures.
-
-The objective of this software is to detect, analyze, and respond to security anomalies in interconnected home devices while preserving data privacy and maintaining lightweight performance suitable for consumer environments. The system integrates multiple modern approaches, including anomaly detection algorithms, behavioral learning, and digital twin simulation, to deliver proactive defense capabilities against evolving IoT threats.
-\subsection{Problem Statement}
-Traditional security approaches, such as signature-based antivirus or firewall systems, are insufficient for detecting novel threats that manifest themselves as subtle behavioral anomalies rather than known attack signatures. Unlike desktops or servers, IoT devices rarely support full-fledged endpoint protection software. Their heterogeneous nature—different operating systems, communication protocols, and limited processing capabilities—makes unified security enforcement extremely difficult.  
-Furthermore, centralized cloud-based monitoring introduces latency, dependency, and privacy concerns, as sensitive device data must be transmitted to third-party infrastructures for analysis. This model is unsustainable for large-scale consumer IoT deployments, where trust boundaries and data ownership are critical.
-
-Another core challenge lies in the changing nature of cyberattacks. Modern adversaries increasingly use stealth techniques that mimic normal device behavior, slowly altering network patterns or response times to avoid detection. Such threats cannot be identified by static rules alone—they require continuous, time-aware behavioral learning.  
-
-To address these challenges, this research proposes a privacy-preserving, edge-oriented security framework designed to operate as an Endpoint Detection and Response (EDR) agent for smart homes.
-
-The system combines multimodal telemetry, rule-based heuristics, and hybrid machine learning techniques, including:
-\begin{itemize}
-    \item \textbf{Isolation Forest} for real-time, unsupervised anomaly detection,
-    \item \textbf{LSTM Autoencoder} for temporal behavior analysis,
-    \item \textbf{Digital Twin Simulation} for modeling expected device behavior and detecting deviations, and
+    \vspace{0.3em}
     
-\end{itemize}
-This hybrid design enables local inference and global intelligence without exposing raw user data. It ensures that home devices remain autonomous, yet secure, adapting dynamically to evolving network behaviors.
+    The Internet of Things (IoT) has rapidly transformed modern homes into highly connected environments, integrating devices such as smart cameras, robot vacuums, sensors, and household appliances. While these devices bring automation and convenience, they also introduce substantial security and privacy risks by expanding the attack surface within residential networks. A single compromised device can enable lateral movement, unauthorized surveillance, or large-scale data exfiltration.
+    
+    Consumer IoT devices are especially vulnerable because they are typically resource-constrained, rarely updated, and often deployed with weak authentication, outdated protocols, and limited visibility into their internal operations. Unlike traditional IT systems, these devices offer no standardized security interfaces, leaving users with no practical way to inspect what data their devices are transmitting or to whom.
+    
+    The magnitude of these vulnerabilities is underscored by large-scale empirical research. In one of the most comprehensive global measurements to date, researchers scanned more than 16 million households and over 83 million IoT devices, uncovering widespread insecurity—including devices exposing open services, relying on weak default credentials, and communicating using outdated or insecure protocols. Complementary studies further reveal that a significant portion of commercially available smart home devices continue to use deprecated TLS versions or advertise weak cipher suites, making them susceptible to interception or manipulation.
+    
+    Given these challenges, there is a critical need for an intelligent, lightweight, and privacy-preserving security framework operating directly at the network edge, where all device communications naturally converge. By analyzing network behavior rather than internal firmware, such a system can protect heterogeneous IoT devices without requiring modification of the devices themselves.
+    
+    The objective of the SafeOn framework is to detect and respond to abnormal device behavior in real time while preserving user privacy and maintaining low computational overhead suitable for consumer home environments. The system leverages an edge-first Endpoint Detection and Response (EDR) architecture, flow-based behavioral modeling, and machine learning–driven anomaly detection to provide proactive protection for everyday IoT devices.
+    
+    \subsection{Problem Statement}
 
-\subsection{Research on Related work}
+    \vspace{0.3em}
+    
+    Traditional security approaches such as signature-based firewalls, antivirus engines, or cloud-centric monitoring are fundamentally ill-suited for today’s IoT environments. Smart home devices rarely support full endpoint protection, lack computational capacity for on-device analysis, and operate with diverse protocols and proprietary firmware, making unified security enforcement nearly impossible.
+    
+    Cloud-based detection introduces additional challenges:
+    \begin{itemize}
+    \item Latency hampers real-time response,
+    
+    \item Privacy concerns arise from uploading raw device data,
+    
+    \item Dependency on external infrastructure reduces reliability during network disruptions.
+    \end{itemize}
+    Furthermore, modern IoT attacks increasingly leverage stealth and mimicry. Adversaries gradually alter communication patterns, spoof legitimate services, or exfiltrate data using low-volume continuous traffic—making such attacks invisible to static rules or simple threshold-based systems.
+    
+    To overcome these limitations, SafeOn introduces a privacy-preserving, edge-oriented EDR system designed specifically for smart home networks. Operating on an OpenWrt-based gateway, SafeOn captures every packet from IoT devices, aggregates them into short flow windows, and performs real-time anomaly detection without exporting sensitive payload data.
+    
+    The proposed system combines:
+    
+    \begin{itemize}
+    \item \textbf{Isolation Forest} — for unsupervised, real-time anomaly scoring on flow-level features,
+    \item \textbf{Random Forest} — for supervised classification of suspicious versus benign flow patterns,
+    
+    \end{itemize}
+    
+    This hybrid detection pipeline enables the system to identify both known and previously unseen behaviors without requiring any intrusive access to device internals. By placing the intelligence directly at the network edge, the framework minimizes privacy risks, reduces latency, and delivers actionable protection for real-world smart home environments.
+    
+    \subsection{Research on Related work}
 
+    \vspace{0.3em}
+    
+    \begin{enumerate}[label=\arabic*]
+        
+         \item SunBlock\par
+         \vspace{0.3em}
+        SunBlock is a cloudless IoT security system that runs entirely on a home router. It combines rule-based filtering (Snort3) with AI-based anomaly detection to identify and block suspicious traffic locally, without sending data to the cloud. This design preserves privacy, reduces latency, and effectively detects common IoT attacks such as unauthorized access and DoS.
+    
+        \item LG Shield\par
+        \vspace{0.3em}
+        LG Shield is LG Electronics’ IoT security platform designed to protect connected home appliances and devices. It ensures secure communication between devices and the cloud by providing features such as device authentication, secure firmware updates, and data transmission encryption. LG Shield is integrated into the LG ThinQ ecosystem to enhance privacy and device reliability.
+        \vspace{1em}
+    
+        \item Samsung Knox\par
+        \vspace{0.3em}
+        Samsung Knox is a multi-layered security platform that protects mobile and IoT devices from hardware to software levels. Built on a hardware root of trust and ARM TrustZone technology, Knox provides features such as secure boot, data encryption, application isolation, and enterprise mobile device management (MDM). It is widely used in both consumer and enterprise environments.
+        \vspace{1em}
+        
+    \end{enumerate}
+    \vspace{1em}
+    % 논문
+    % 관련 소프트웨어
+    % lg shield
+    % Existing IoT security solutions, EDR systems, anomaly detection methods
+    
+    
+    \section{Threat Model}
+    
+    \subsection{System Context}
+
+    \vspace{0.3em}
+    
+    SafeOn is an on-premise IoT defense framework designed to secure smart-home environments through an edge-oriented Endpoint Detection and Response (EDR) architecture.
+    Deployed on an OpenWrt-based gateway such as a Raspberry Pi, SafeOn intercepts all traffic originating from household IoT devices—including cameras, sensors, robot vacuums, and smart appliances—before it reaches the wider internet.
+    Rather than relying on intrusive firmware instrumentation or cloud services, the system passively collects network-level telemetry and transforms raw packets into short flow windows suitable for lightweight machine learning analysis.
+    SafeOn employs a hybrid anomaly detection pipeline consisting of:
+    \begin{itemize}
+        \item Isolation Forest for real-time, unsupervised anomaly scoring,
+    
+        \item Random Forest for supervised classification of suspicious flow behaviors,
+    \end{itemize}
+    
+    This design allows SafeOn to detect both instantaneous anomalies and persistent behavioral changes using only local inference. Because all detection logic runs on-premise at the network edge, SafeOn ensures low latency, strong privacy preservation, and does not expose raw device data to external cloud servers.This architecture provides a practical and deployable defense model suitable for real-world consumer IoT environments.
+    
+    \subsection{Assets}
+    
+    \vspace{0.3em}
+    
+    SafeOn protects several critical digital and operational assets within the smart-home network. These assets fall into the following categories:
+    
+    \begin{itemize}
+        \item \textbf{Data Assets}: Captured packet-flow windows, device discovery records, anomaly scores, classification outputs, and stored telemetry used for forensic analysis.
+        \item \textbf{Functional Assets}: The ML inference pipeline—including feature extraction, Isolation Forest scoring, and Random Forest classification—as well as backend ingestion and dashboard interfaces.
+        \item \textbf{Control Assets}: Local configuration states, device-blocking policies, model parameters, MQTT topic bindings, and gateway-level network rules executed through the SafeOn edge node.
+        \item \textbf{Privacy Assets}: Sensitive user-relevant information implicitly revealed through device traffic patterns, usage timelines, and network behavior signatures.
+    \end{itemize}
+    
+    Maintaining the confidentiality, integrity, and availability of these assets is essential to ensuring reliable real-time detection and response.
+    
+    
+    \subsection{Adversarial Model}
+
+    \vspace{0.3em}
+    
+    SafeOn considers a range of adversarial threats commonly observed in residential IoT environments. The threat model includes the following attacker classes:
+    
+    \begin{itemize}
+        \item \textbf{External Adversaries (WAN-side)}: Remote attackers attempting to compromise IoT devices through exposed services, weak authentication, outdated protocols, or brute-force entry points. Their goals may include unauthorized data access, device hijacking, or covert command execution.
+    
+        \item \textbf{Internal Adversaries (LAN-side)}: Compromised IoT devices, malware-infected clients, or malicious insiders within the home network. These adversaries can generate traffic that mimics legitimate device behavior, perform low-rate data exfiltration, or manipulate flow patterns to evade anomaly detection.
+    
+        \item \textbf{Edge-level or Configuration Adversaries}: Attackers attempting to tamper with network configurations, manipulate MQTT messages, disrupt telemetry collection, or inject falsified flow data at the edge node. Such attackers aim to impair SafeOn’s detection capabilities or conceal malicious behavior.
+    
+        \item \textbf{Firmware-level Adversaries}: Threat actors capable of modifying device firmware or exploiting insecure update channels. These adversaries may alter device networking behavior, disable security features, or cause persistent anomalous patterns without triggering obvious alarms.
+    \end{itemize}
+    
+    These adversary categories reflect a shift toward more stealth-oriented and behavior-centric attacks, emphasizing the need for continuous, flow-based behavioral analysis rather than reliance on traditional signature-based defenses.
+    
+    \subsection{Attack Vectors}
+
+    \vspace{0.3em}
+    
+    Within this adversarial landscape, potential attack vectors against the SafeOn ecosystem can be categorized into five primary groups:
+    
+    \begin{itemize}
+        \item \textbf{Network-level Attacks}: Unauthorized connection attempts, port scanning, brute-force access, and volumetric denial-of-service (DoS/UDP flooding) directed at vulnerable IoT devices or the OpenWrt-based gateway. These attacks aim to disrupt device availability or establish an initial foothold.
+    
+        \item \textbf{Flow-level Manipulation Attacks}: Adversaries may attempt to craft malicious packet sequences or alter traffic distributions to imitate benign flow patterns. By intentionally shaping packet sizes, timing intervals, or destination endpoints, attackers may try to evade flow-based anomaly detection.
+    
+        \item \textbf{Behavioral Evasion Attacks}: Since SafeOn models device behavior using flow windows and statistical feature patterns, adversaries may employ low-and-slow exfiltration, intermittent malicious bursts, or interleaving legitimate and malicious flows to remain below anomaly thresholds.
+    
+        \item \textbf{Firmware-level Attacks}: Attackers with deeper access may attempt to modify IoT device firmware to change networking behavior, introduce covert channels, or disable outward symptoms of compromise. Such threats may manifest as persistent anomalous patterns at the network layer.
+    
+        \item \textbf{Privacy-oriented Attacks}: Passive observers may attempt to infer user activity patterns, occupancy schedules, or device usage habits from unencrypted metadata, DNS queries, or timing characteristics of IoT communications.
+    \end{itemize}
+    
+    These attack vectors reflect the multi-layered and behavior-driven nature of modern IoT threats, where deviations often appear not in payloads but in network flow characteristics.
+    
+    \subsection{Security Goals}
+
+    \vspace{0.3em}
+    
+    The SafeOn framework is designed to achieve the following core security objectives:
+    
+    \begin{itemize}
+        \item \textbf{Confidentiality}: All telemetry—including flow windows, device states, and anomaly scores—is processed locally on the edge gateway. No raw packet data or device behavior is uploaded to external cloud services.
+    
+        \item \textbf{Integrity}: Machine learning model files, configuration parameters, and historical logs are protected from tampering through controlled file permissions and local verification mechanisms, ensuring accurate and trustworthy inference.
+    
+        \item \textbf{Availability}: The detection pipeline operates autonomously on the OpenWrt gateway, continuing to function even during WAN outages. Local MQTT communication ensures uninterrupted data flow between collection, backend, and ML components.
+    
+        \item \textbf{Accuracy and Robustness}: The combination of \textbf{Isolation Forest} for unsupervised anomaly scoring and \textbf{Random Forest} for supervised flow classification enhances resilience against both known and previously unseen attack patterns.
+    
+        \item \textbf{Accountability}: All alerts, classification outputs, blocking decisions, and system responses are logged locally on the backend, enabling transparent forensic investigation after an incident.
+    \end{itemize}
+    
+    These goals reinforce SafeOn’s commitment to secure, privacy-preserving, and reliable operation within consumer home networks.
+    
+    \subsection{Threat--Defense Mapping}
+
+    \vspace{0.3em}
+    
+    SafeOn incorporates multiple defensive components aligned with its attack model:
+    
+    \begin{itemize}
+        \item \textbf{Network-level Attacks}: Mitigated through gateway-level traffic monitoring, device isolation within a dedicated IoT subnet, and continuous flow extraction that exposes abnormal connection attempts or traffic bursts.
+    
+        \item \textbf{Flow-level Manipulation}: Countered by the Isolation Forest model, which identifies deviations in multivariate flow statistics such as packet counts, byte distributions, and inbound/outbound ratios.
+    
+        \item \textbf{Behavioral Evasion Attempts}: Detected through combined analysis of anomaly scores and Random Forest classification, which captures subtle deviations across aggregated flow windows even under low-rate or intermittent attack strategies.
+    
+        \item \textbf{Firmware-level Manipulation}: Persistent or unnatural communication patterns emerging from compromised firmware are reflected in long-term flow trends and can be identified through statistical abnormalities and repeated anomaly scoring.
+    
+        \item \textbf{Privacy Attacks}: Minimized by keeping all telemetry local, discarding unnecessary metadata, and avoiding any cloud-based data transfer.
+    \end{itemize}
+    
+    Together, these mechanisms provide layered defense and visibility into IoT network behavior without requiring modifications to device hardware or firmware.
+    
+
+    \section{Requirements}
+
+    This section summarizes the high-level requirements of the SafeOn system. 
+    A more detailed specification, including UI flows and system diagrams, will be 
+    provided in later sections.
+    
+    \subsection{Functional Requirements(FR)}
+    
+    \begin{itemize}
+    
+        \item \textbf{FR-01: User Authentication} \\
+        The system shall provide secure user registration and login using JWT-based authentication.
+        \vspace{0.3em}
+    
+        \item \textbf{FR-02: IoT Device Discovery} \\
+        The system shall automatically detect newly connected IoT devices from the OpenWrt gateway and display them to the user as unclaimed devices.
+        \vspace{0.3em}
+        
+        \item \textbf{FR-03: Device Claiming} \\
+        Users shall be able to register ownership of discovered devices.
+        \vspace{0.3em}
+    
+        \item \textbf{FR-04: Flow Generation and Transmission} \\
+        The gateway shall capture raw packets using \texttt{tcpdump}, aggregate them into 3-second flow windows, and transmit flow features to the backend via MQTT.
+        \vspace{0.3em}
+        
+        \item \textbf{FR-05: Flow Ingestion and Storage} \\
+        The backend shall receive flow data from MQTT, validate it, and store it in TimescaleDB for further analysis.
+        \vspace{0.3em}
+    
+        \item \textbf{FR-06: Machine Learning Inference} \\
+        The backend shall forward flow features to the ML server and receive anomaly scores (Isolation Forest) and classification labels (Random Forest).
+        \vspace{0.3em}
+    
+        \item \textbf{FR-07: Anomaly Detection and Alerting} \\
+        The system shall generate an alert when suspicious activity is detected (e.g. repeated anomalies, malicious prediction, external IP access). Alerts shall be delivered to the frontend in real time.
+        \vspace{0.3em}
+    
+        \item \textbf{FR-08: Real-Time Traffic Monitoring} \\
+        The backend shall provide a WebSocket endpoint to stream device traffic statistics to the dashboard.
+        \vspace{0.3em}
+        
+        \item \textbf{FR-09: Device Blocking} \\
+        Users shall be able to block a compromised device, and the backend shall send a block command to the gateway to isolate the device.
+        \vspace{0.3em}
+    \end{itemize}
+    
+    \subsection{Non-functional Requirements(NFR)}
+    
+    \begin{itemize}
+    
+        \item \textbf{NFR-01: Performance} \\
+        End-to-end anomaly detection latency should remain within a few seconds.
+        \vspace{0.3em}
+    
+        \item \textbf{NFR-02: Privacy} \\
+        No raw packet payloads shall be transmitted outside the local system. 
+        \vspace{0.3em}
+    
+        \item \textbf{NFR-03: Availability} \\
+        The system shall continue operating locally even if internet connectivity is temporarily unavailable.
+        \vspace{0.3em}
+    
+        \item \textbf{NFR-04: Security} \\
+        All APIs and WebSocket connections shall require authentication.
+        \vspace{0.3em}
+    
+        \item \textbf{NFR-05: Usability} \\
+        The dashboard shall clearly visualize device status, alerts, and real-time traffic in an accessible manner.
+        \vspace{0.3em}
+    
+    \end{itemize}
+    
+    \subsection{Constraints}
+    
+    \begin{itemize}
+    
+        \item \textbf{C-01: Edge Hardware Limitations} \\
+        The OpenWrt gateway has limited CPU and memory; therefore, all ML inference must be performed on an external ML server.
+        \vspace{0.3em}
+    
+        \item \textbf{C-02: Wireless Network Variability} \\
+        IoT device traffic depends on Wi-Fi signal stability and may fluctuate.
+        \vspace{0.3em}
+    
+        \item \textbf{C-03: MQTT Dependency} \\
+        Flow transmission relies on a stable MQTT connection between the gateway and backend.
+        \vspace{0.3em}
+    
+        \item \textbf{C-04: Storage Constraints} \\
+        High-frequency flow data requires efficient time-series storage and retention policies.
+        \vspace{0.3em}
+    
+    \end{itemize}
+
+    \subsection{AI Model}
+    
+To provide real-time detection of abnormal behavior in heterogeneous IoT devices, \textit{SafeOn} adopts a flow-based anomaly detection pipeline tightly integrated with the edge-first architecture. The AI component of the system is organized into three stages:
+
+\vspace{0.5em}
 \begin{enumerate}[label=\arabic*]
-    
-     \item SunBlock\par
-     \vspace{0.3em}
-    SunBlock is a cloudless IoT security system that runs entirely on a home router. It combines rule-based filtering (Snort3) with AI-based anomaly detection to identify and block suspicious traffic locally, without sending data to the cloud. This design preserves privacy, reduces latency, and effectively detects common IoT attacks such as unauthorized access and DoS.
 
-    \item LG Shield\par
+    % Item 1
+    \item Dataset Construction from Real IoT Traffic \par
     \vspace{0.3em}
-    LG Shield is LG Electronics’ IoT security platform designed to protect connected home appliances and devices. It ensures secure communication between devices and the cloud by providing features such as device authentication, secure firmware updates, and data transmission encryption. LG Shield is integrated into the LG ThinQ ecosystem to enhance privacy and device reliability.
+    we build our dataset directly from packet traces collected in a realistic smart-home setting. Using \texttt{tcpdump} on the OpenWrt-based gateway, we capture raw network traffic generated by an ESP32-CAM under both benign usage and attacker-driven scenarios.
+    
+    The captured packets are aggregated into 3-second time-windowed flows and converted into flow records containing statistics such as packet count, byte count, duration, and throughput. Each flow is then labeled as \textit{normal} or \textit{attack} based on the ground-truth scenario during data collection.
+
+    The final dataset consists of:
+    \begin{itemize}
+        \item 16\,366 \textbf{normal} flows,
+        \item 10\,504 \textbf{attacker} flows.
+    \end{itemize}
+
+    This results in a moderately imbalanced but realistic traffic distribution that reflects typical smart-home operation with intermittent malicious activity. The dataset is split into training and evaluation subsets, and feature-wise normalization is applied where required.
+
     \vspace{1em}
 
-    \item Samsung Knox\par
+    % Item 2
+    \item Flow-based Feature Engineering and Preprocessing \par
     \vspace{0.3em}
-    Samsung Knox is a multi-layered security platform that protects mobile and IoT devices from hardware to software levels. Built on a hardware root of trust and ARM TrustZone technology, Knox provides features such as secure boot, data encryption, application isolation, and enterprise mobile device management (MDM). It is widely used in both consumer and enterprise environments.
+    Each flow window is represented as a fixed-length feature vector derived from the underlying packet sequence. The features include basic statistics (packet and byte counts, flow duration), rate-based metrics (packets per second, bytes per second), and simple structural attributes (source/destination ports, protocol type, time bucket).
+
+    These features are designed to be lightweight enough for real-time processing at the edge, while still capturing meaningful differences between benign and malicious behaviors such as scanning attempts, abnormal bursts, or unusual external communications. Categorical attributes (e.g., protocol) are encoded appropriately, and numerical features are standardized to stabilize model training.
+
     \vspace{1em}
-    
-\end{enumerate}
-\vspace{1em}
-% 논문
-% 관련 소프트웨어
-% lg shield
-% Existing IoT security solutions, EDR systems, anomaly detection methods
 
-
-\section{Threat Model}
-
-\subsection{System Context}
-
-SafeOn is an on-premise IoT defense framework designed to enhance the security and resilience of smart-home ecosystems.
-It functions as a lightweight endpoint detection and response (EDR) agent that integrates a Digital Twin simulation engine to model the expected behavior of connected devices.
-Deployed on an edge gateway such as an OpenWrt-based Raspberry Pi, SafeOn continuously collects and analyzes telemetry data from household IoT devices including cameras, smart locks, air purifiers, and sensors.
-Its hybrid anomaly detection core combines Isolation Forest for spatial anomaly identification and LSTM Autoencoder for temporal behavior analysis.
-By comparing real-world operational data against the digital twin’s simulated baseline, SafeOn detects both instantaneous and time-dependent deviations without relying on external cloud services.
-This architecture ensures low latency, local decision-making, and strict privacy preservation while maintaining high detection accuracy for dynamic IoT environments.
-
-\subsection{Assets}
-
-SafeOn protects a range of digital and operational assets within the home IoT network.
-The key asset categories are as follows:
-
-\begin{itemize}
-    \item \textbf{Data Assets}: Device telemetry logs, network activity traces, and digital-twin simulation outputs that describe the operational state of appliances.
-    \item \textbf{Functional Assets}: The SafeOn anomaly detection modules, EDR agent logic, and the digital twin simulator that collectively perform detection and response actions.
-    \item \textbf{Control Assets}: Configuration files, local rule sets, alert policies, and automated mitigation scripts that determine how SafeOn responds to detected threats.
-    \item \textbf{Privacy Assets}: User behavioral information implicitly reflected in sensor readings, device usage timelines, and environmental context data.
-\end{itemize}
-
-Each of these asset categories is considered critical for maintaining the confidentiality, integrity, and reliability of the smart-home security environment.
-
-\subsection{Adversarial Model}
-
-The SafeOn threat model considers three main categories of adversaries:
-
-\begin{itemize}
-    \item \textbf{External Adversaries (WAN-side)}: Attackers located outside the local network who attempt to exploit open interfaces, outdated communication protocols, or weak authentication mechanisms. Their goals may include network reconnaissance, data exfiltration, or denial-of-service attacks.
-    \item \textbf{Internal Adversaries (LAN-side)}: Compromised IoT devices or malicious insiders within the home network. Such attackers can mimic normal device behavior, inject spoofed telemetry, or interfere with other devices to evade anomaly detection.
-    \item \textbf{Firmware-level Adversaries}: Entities capable of tampering with device firmware or model update channels. These attackers may attempt to replace anomaly detection modules, alter digital twin parameters, or introduce backdoors during firmware updates.
-\end{itemize}
-
-This adversarial landscape reflects the transition from purely external network attacks toward more subtle behavioral and firmware-level manipulations typical of modern IoT environments.
-
-\subsection{Attack Vectors}
- 
-Within this model, potential attack vectors are classified into five categories.
-
-\begin{itemize}
-    \item \textbf{Network-level Attacks}: Unauthorized access attempts, port scanning, and denial-of-service (DoS) or UDP flooding that target the gateway or connected devices.
-    \item \textbf{Telemetry-level Attacks}: Injection or modification of device sensor data to imitate normal patterns and conceal malicious activity.
-    \item \textbf{Behavioral-level Attacks}: Manipulation of timing or sequence dependencies to confuse LSTM-based detection, such as delayed commands or interleaved legitimate and malicious actions.
-    \item \textbf{Firmware-level Attacks}: Corruption or rollback of model parameters and digital twin baselines through compromised over-the-air (OTA) updates.
-    \item \textbf{Privacy-level Attacks}: Passive inference of user behavior or household occupancy patterns from unencrypted metadata and device communication timing.
-\end{itemize}
-
-These vectors collectively represent the layered and dynamic nature of IoT threats, where anomalies may occur at both the data and behavioral levels.
-
-\subsection{Security Goals}
-
-The SafeOn framework is designed to achieve the following security objectives.
-
-\begin{itemize}
-    \item \textbf{Confidentiality}: All telemetry data is processed and stored locally; no raw data leaves the home network.
-    \item \textbf{Integrity}: Model files, digital twin configurations, and logs are protected using checksums and digital signatures to prevent tampering.
-    \item \textbf{Availability}: The detection and response components continue functioning autonomously even when the gateway is disconnected from the Internet.
-    \item \textbf{Accuracy and Robustness}: The combination of Isolation Forest and LSTM Autoencoder ensures comprehensive detection of both static and time-evolving anomalies.
-    \item \textbf{Accountability}: Every alert, decision, and automated mitigation action is locally logged to enable transparent forensic analysis.
-\end{itemize}
-
-These goals collectively ensure that SafeOn maintains trustworthy operation while respecting the user’s data privacy and autonomy.
-
-\subsection{Threat–Defense Mapping}
-
-Each type of threat is mitigated through a corresponding mechanism within SafeOn’s architecture:
-
-Network-level attacks are countered by rule-based traffic filtering and connection throttling at the gateway.
-
-Telemetry manipulation is detected through Isolation Forest analysis of multivariate device metrics.
-
-Behavioral anomalies are identified using LSTM Autoencoder models trained on time-series device patterns.
-
-Firmware tampering is prevented through digital signature verification and rollback protection.
-
-Privacy inference risks are reduced by performing all processing locally and minimizing the amount of metadata retained.
-
-\subsection{Discussion}
-
-Compared with traditional cloud-based or router-level intrusion prevention systems, SafeOn extends protection from packet inspection to behavioral and operational validation.
-Its use of Digital Twin simulation allows for contextual interpretation of anomalies — distinguishing between benign deviations and truly malicious behavior.
-The combination of edge-side analytics, real-time AI inference, and privacy-by-design principles enables SafeOn to serve as an autonomous, self-adaptive defense mechanism for smart-home environments.
-
-By operating entirely on local infrastructure, it not only eliminates third-party data exposure but also establishes a scalable foundation for resilient IoT security.
-
-    \section{System Architecture}
-    
-    \subsection{System Overview}
-    
-    
-    The SafeOn framework is designed as an intelligent endpoint detection and response (EDR) system tailored for smart home IoT environments. Modern residential networks contain heterogeneous devices such as smart cameras, lighting systems, thermostats, and sensors that communicate continuously over wireless protocols including Wi-Fi, Zigbee, and Bluetooth Low Energy. These devices frequently depend on external cloud APIs for control and data synchronization, resulting in a widened attack surface. Limited computational capacity and weak security enforcement in consumer IoT hardware further exacerbate this vulnerability, exposing networks to potential firmware exploits, unauthorized remote access, and lateral movement attacks.
-    
-    To address these challenges, SafeOn introduces an edge-level EDR layer that operates on Raspberry Pi gateways running OpenWrt. Instead of directly modifying the firmware of end devices, the system passively monitors network traffic to observe behavioral patterns. It constructs statistical and temporal representations of device communication flows and establishes a baseline of normal activity. By utilizing an Isolation Forest for anomaly detection and an LSTM-based temporal model for sequence prediction, SafeOn identifies deviations that indicate abnormal or malicious behavior in real time.
-    
-    Complementing this detection pipeline, SafeOn employs a digital twin–based simulation environment that mirrors the operational state of connected devices. This virtual model continuously compares live data against expected behavioral profiles, allowing the framework to detect zero-day attacks and previously unseen anomalies that would otherwise bypass conventional signature-based defenses.
-    The overall architecture integrates the following core components:
-    \vspace{0.5em}
-
-    \begin{enumerate}[label=\arabic*)]
-    \item Edge Monitoring Layer — OpenWrt-based Raspberry Pi nodes capture and preprocess IoT network traffic, extracting relevant metadata for analysis.
-    \vspace{0.5em}
-    
-    \item Anomaly Detection Engine — A hybrid model combining Isolation Forest and LSTM networks evaluates behavioral deviations and assigns threat scores.
-    \vspace{0.5em}
-    
-    \item Digital Twin Module — A virtualized representation of each device reproduces normal operational states to validate real-world observations.
-    \vspace{0.5em}
-    
-    \item Cloud Dashboard and Alert System — Aggregated insights are transmitted to a centralized dashboard for visualization, reporting, and automated incident response.
-    \vspace{0.5em}
-    \end{enumerate}
-    
-    Through this distributed and model-driven architecture, SafeOn achieves low-latency, real-time threat detection without requiring invasive modifications to IoT devices. By merging data-driven analytics with digital twin simulation, the framework provides a resilient and scalable approach to securing smart home ecosystems against both known and emerging threats.
-
-    \subsection{System Components}
-
-    The SafeOn architecture comprises four primary layers: edge monitoring, data processing and inference, digital twin simulation, and management and visualization. Each layer cooperatively contributes to end-to-end anomaly detection, threat response, and system observability.
-    \vspace{0.5em}
-    
-    \begin{enumerate}[label=\arabic*]
-
-    \item Edge Monitoring Layer: \par
+    % Item 3
+    \item Hybrid Anomaly Detection with Isolation Forest and Random Forest \par
     \vspace{0.3em}
-    This layer is deployed on OpenWrt-based Raspberry Pi gateways, which serve as the primary observation nodes within the local IoT network. Network packets are captured via lightweight agents that employ libpcap and Netfilter hooks for low-latency data extraction. The collected traffic is parsed to extract metadata such as device identifiers, communication frequency, and protocol usage. Feature vectors are generated and cached locally for short-term temporal correlation. By performing this preprocessing near the data source, network congestion and cloud dependency are minimized, ensuring real-time responsiveness.
-    \vspace{0.5em}
-    
-    \item Data Processing and Inference Layer:\par
-    \vspace{0.3em}
-    At this stage, preprocessed feature vectors are analyzed by a hybrid anomaly detection engine combining Isolation Forest (IF) and Long Short-Term Memory (LSTM) models. The Isolation Forest algorithm captures statistical outliers in multidimensional feature spaces, effectively identifying abnormal device interactions or data bursts. In contrast, the LSTM model learns temporal dependencies, detecting sequential deviations from normal communication patterns. The ensemble of both models improves robustness by correlating spatial and temporal anomalies, thus reducing false positives.
-    \vspace{0.5em}  
-    
-    \item Digital Twin Simulation Layer:\par
-    \vspace{0.3em}
-    The digital twin module establishes a virtual counterpart of each IoT device within a controlled simulation environment. Each twin continuously synchronizes with real-time telemetry from the edge nodes, generating predictive behavioral baselines through historical learning. Discrepancies between the expected (twin-generated) and observed behaviors are quantified as deviation scores, which contribute to overall threat evaluation. This approach enables early detection of zero-day exploits, device misconfigurations, and stealthy command injections that bypass conventional detection methods.
-    \end{enumerate}
+    The core AI engine consists of two complementary models:
 
-    \subsection{Data Flow and Detection Pipeline}
+    \begin{itemize}
+        \item \textbf{Isolation Forest} is used as an unsupervised model to compute an anomaly score for each flow based on how easily it can be isolated in the feature space.
+        \item \textbf{Random Forest} is trained in a supervised manner on the labeled dataset to classify flows as benign or attacker traffic.
+    \end{itemize}
 
-    The SafeOn data pipeline is designed for continuous monitoring, adaptive learning, and responsive mitigation within smart home IoT networks. 
-    \vspace{0.5em}
-    
-    \begin{enumerate}[label=\arabic*]
-    
-    \item Traffic Capture and Feature Extraction\par
-    \vspace{0.3em}
-    The edge node continuously captures packet streams from connected IoT devices. Traffic is filtered to exclude benign background processes and reduced into statistical and temporal features such as packet intervals, payload size variance, and destination entropy. Each feature vector represents a time-windowed snapshot of device behavior.
-    \vspace{0.5em}
+    Both models are implemented on a separate FastAPI-based ML server and exposed via lightweight inference endpoints. During operation, the backend forwards newly arrived flow features to the ML server and receives an Isolation Forest score and a Random Forest prediction in response.
 
-    \item Local Inference and Edge Scoring\par
-    \vspace{0.3em}
+    SafeOn combines these outputs into a hybrid decision rule: flows with high anomaly scores and malicious Random Forest predictions are marked as suspicious. When consecutive suspicious flows are observed from the same device, SafeOn generates an alert and notifies the user through the dashboard. Blocking is not performed automatically; instead, the user may initiate a containment action. Upon user request, the backend transmits a block command to the OpenWrt gateway, which enforces device isolation via firewall rules. This design enables robust detection of both clearly malicious and more subtle anomalous behaviors while remaining computationally efficient for deployment in consumer smart-home environments.
 
-    The extracted features are passed through the embedded Isolation Forest model to obtain a local anomaly score. Only summarized metadata and abnormal traces are forwarded to the central inference layer, thereby reducing bandwidth usage and maintaining user privacy.
-    \vspace{0.5em}
     
-    \item Centralized Correlation and Twin Validation\par
-    \vspace{0.3em}
-    
-    The cloud-level LSTM model aggregates input from multiple edge nodes, reconstructing multi-device interaction patterns. Detected anomalies are cross-referenced against their corresponding digital twins to validate whether deviations represent genuine threats or benign anomalies. This dual verification mechanism enhances detection precision.
-    \vspace{0.5em}
-    
-    \item Alert Generation and Feedback Loop\par
-    \vspace{0.3em}
-    
-    Once an event surpasses the defined threat threshold, the system generates a structured alert containing device identifiers, timestamps, and anomaly metrics. Alerts are logged in the dashboard and optionally relayed to external systems for automated containment (e.g., network isolation or access control policy updates). Feedback from analysts or user responses is incorporated into periodic model retraining to sustain long-term adaptability.
-    \end{enumerate}
-    
-    \subsection{AI model}
-    
-    To create AI services that detect abnormal behaviors of various IoT devices in a smart home environment in real time , \textit{SafeOn} has divided its service into three components:
-    
-    \vspace{0.5em}
-    
-    \begin{enumerate}[label=\arabic*]
-        % Item 1
-        \item Dataset Creation for IoT Anomaly Detection\par 
-        \vspace{0.3em}
-        To learn various security threats that can arise in smart home environments, an additional learning dataset specialized for LG Electronics' home appliance environment was constructed based on the open dataset ToN-IoT (Telemetry and Network IoT Dataset). ToN-IoT includes sensor telemetry logs and network traffic collected from real IoT devices (temperature, illumination, power, vibration sensors, etc.), with normal and abnormal (DoS, Spooping, Reconnaissance, etc.) states labeled. Based on this dataset, we created an additional 10,000 synthetic data that simulates the usage patterns and operation logs of LG home appliances (refrigerators, washing machines, air purifiers, robot vacuum cleaners, etc.) using Generative AI to increase real-world applicability. The generated data reflects factors such as power consumption, sensor change rate, operating cycle, usage time zone, and network call pattern with reference to actual LG ThinQ platform operation scenarios, and is designed to include normal/abnormal status in a balanced manner based on actual user behavior patterns.
-    
-        The final hybrid dataset was built through the following steps: \vspace{0.5em}
-    
-        
-        \begin{enumerate}[label=\arabic*)]
-        \item Refining the ToN-IoT Source Log and Sorting Time Series \vspace{0.5em}
-        
-        \item The sliding window produces 30 seconds of continuous input
-        \vspace{0.5em}
-        
-        \item Normal/Abnormal Ratio Readjustment (SMOTE)
-        \vspace{0.5em}
-        
-        \item Quality verification after full integration with 10,000 additional generated AI-based synthetic data
-        \vspace{0.5em}
-        
-        \item Structuring federated learning applications with device-specific sharding via IoT devices
-        \vspace{0.5em}
-    \end{enumerate}
-    
-    This process completes a hybrid IoT security dataset that reflects the generalized pattern of open datasets and the realistic characteristics of LG home appliance environments at the same time. This ensures high detection accuracy and real-time responsiveness even in certain brand/device environments.
-    
-        \vspace{1em}
-        
-        % Item 2
-        \item Development of LSTM-based AI Model for Real-Time Detection \par
-        \vspace{0.3em}
-        The core AI engine for abnormality detection is designed as a time series analysis model based on long short-term memory (LSTM). LSTM is a type of recurrent neural network (RNN), which can effectively learn long-term dependence in time series data. This enables immediate warning and response before security threats or system errors occur, and strengthens safety and reliability in smart homes.
-    
-        This model continuously receives data streams collected from IoT devices and detects anomalies (abnormal power patterns, data transmission abnormalities, response delays, etc.) that deviate from the normal state in real time. The detection results can be transmitted to the internal security module and lead to immediate alerts, log records, or automated response scenarios. These structures enable real-time proactive security, not just post-analysis, and increase the safety and reliability of the entire smart home.
-    
-        \vspace{1em}
-    
-       
-    \end{enumerate}
 
-\section{Development environment}
+    \section{Development environment}
 
     \subsection{Choice of Software Development Platform}
     \vspace{0.5em}
@@ -395,6 +495,7 @@ By operating entirely on local infrastructure, it not only eliminates third-part
         \vspace{0.5em}
         macOS is Apple’s operating system providing a robust development environment centered around Xcode for Apple ecosystem development. Its Unix foundation offers powerful command line capabilities, while package managers like Homebrew facilitate tool management. The platform excels in native development through Swift and Objective C support, and includes comprehensive debugging and performance optimization tools. macOS integrates smoothly with Apple services like iCloud and TestFlight for deployment, while maintaining security through features like Gatekeeper. Its UNIX certification and virtual machine support enable versatility across different development scenarios.
         \end{enumerate}
+        \vspace{0.5em}
     
     \item Language and Framework \par
     \vspace{0.5em}
@@ -402,116 +503,83 @@ By operating entirely on local infrastructure, it not only eliminates third-part
         \vspace{0.5em}
     
         \begin{enumerate}[label=\arabic*)]
+        \begin{figure}[h]
+            \centering
+            \includegraphics[width=0.2\textwidth]{images/logo/python_logo.png}
+            \caption{Python}
+            \label{fig:Python}
+        \end{figure}
         \item Python \par
         \vspace{0.5em}
         Python is a versatile and widely used high-level programming language, praised for its simplicity and readability. This makes it particularly attractive for both beginners and experienced developers. Python’s extensive standard library and rich ecosystem of third-party libraries provide powerful tools for various tasks, including web development, data analysis, and artificial intelligence. The language’s strong support for object-oriented, imperative, and functional programming paradigms allows developers to choose the style that best fits their needs. Furthermore, Python is heavily utilized in the AI community due to its robust frameworks and libraries that facilitate tasks such as data preprocessing, model building, and evaluation.
         \vspace{0.5em}
-        
+
         \item Dart \par
-        \vspace{0.5em}
-    
-        Dart is a modern, object-oriented programming language developed by Google, designed to provide both efficiency and readability. It combines the simplicity of dynamically typed languages with the performance benefits of statically typed ones. Dart supports multiple programming paradigms—object-oriented, imperative, and functional—allowing developers to select the most effective approach for their specific tasks.
         
-        The language is widely appreciated for its clean and expressive syntax, making it accessible to both novice and experienced programmers. Dart’s dual compilation model, which includes Just-In-Time (JIT) for rapid prototyping and Ahead-Of-Time (AOT) for optimized production builds, provides flexibility throughout the development process. Moreover, Dart’s robust asynchronous programming capabilities, comprehensive standard library, and thriving ecosystem (including pub.dev) make it well-suited for building high-performance, cross-platform applications. As the foundation of the Flutter framework, Dart has become an essential tool in modern mobile and web development.
+        \begin{figure}[h]
+            \centering
+            \includegraphics[width=0.2\textwidth]{images/logo/dart_logo.png}
+            \caption{Dart}
+            \label{fig:Dart}
+        \end{figure}
+    
+        Dart is a modern, object-oriented language developed by Google, designed for both efficiency and readability. It combines the simplicity of dynamic languages with the performance advantages of static typing and supports multiple paradigms such as object-oriented, imperative, and functional programming. Dart features clean and expressive syntax, a dual compilation model—JIT for fast development and AOT for optimized builds—and strong asynchronous programming support. With its rich ecosystem and integration as the core language of Flutter, Dart enables high-performance, cross-platform application development.
         \vspace{0.5em}
     
         \item Java \par
-        \vspace{0.5em}
+
+        \begin{figure}[h]
+            \centering
+            \includegraphics[width=0.2\textwidth]{images/logo/java_logo.png}
+            \caption{Java}
+            \label{fig:Java}
+        \end{figure}
         Java is a powerful, object-oriented programming language designed for portability, reliability, and performance. Its core principle, “write once, run anywhere,” is made possible by the Java Virtual Machine (JVM), allowing code to run seamlessly across platforms. Java emphasizes strong typing, automatic memory management, and clear syntax, which enhance code stability and readability.
     
         With its extensive standard library and frameworks like Spring, Java supports a wide range of development—from web and mobile apps to enterprise-scale systems. Its support for multithreading, modularity, and robust security makes it a preferred choice for large and scalable software projects. Furthermore, Java continues to evolve, incorporating modern features such as lambdas, streams, and modular programming to improve productivity and expressiveness.
         \vspace{0.5em}
     
         \item FastAPI\par
-        \vspace{0.5em}
+        \begin{figure}[h]
+            \centering
+            \includegraphics[width=0.2\textwidth]{images/logo/fastapi_logo.png}
+            \caption{FastApi}
+            \label{fig:FastApi}
+        \end{figure}
     
-        FastAPI is a modern, high-performance web framework for building APIs with Python. It is designed to streamline API development by utilizing Python 3.7+ type hints, which enhance both code validation and readability. Built upon Starlette for the web layer and Pydantic for data handling, FastAPI achieves performance comparable to frameworks written in Node.js and Go.
-        
-        One of FastAPI’s most distinctive features is its ability to automatically generate interactive API documentation based on the OpenAPI specification, with Swagger UI and ReDoc integrated by default. The framework also offers full support for asynchronous programming through async and await, making it particularly well-suited for high-concurrency applications.
-        
-        Developers benefit from built-in dependency injection, automatic data validation, and serialization, which significantly reduce boilerplate code and lower the risk of runtime errors. FastAPI’s strong type checking ensures that request and response data strictly conform to defined schemas, thereby improving reliability and maintainability.
-        
-        Due to its speed, simplicity, and robust feature set, FastAPI has become a preferred choice for developing RESTful APIs, deploying machine learning models, and building microservices in modern production environments.
+        FastAPI is a modern, high-performance Python framework for building APIs, designed to simplify development through Python type hints and automatic validation. Built on Starlette and Pydantic, it delivers fast execution comparable to Node.js and Go.
+        One of its strengths is the automatic generation of interactive API documentation via OpenAPI, including Swagger UI and ReDoc. FastAPI also supports asynchronous programming with async/await, making it suitable for high-concurrency workloads.
+        With features such as dependency injection, data validation, and clear schema enforcement, FastAPI reduces boilerplate code and enhances reliability. Its speed, simplicity, and strong tooling make it an ideal choice for RESTful APIs, ML model serving, and lightweight microservices.
         \vspace{0.5em}
     
         \item Flutter \par
-        \vspace{0.5em}
+        \begin{figure}[h]
+            \centering
+            \includegraphics[width=0.2\textwidth]{images/logo/flutter_logo.png}
+            \caption{Flutter}
+            \label{fig:Flutter}
+        \end{figure}
     
-        Flutter is an open-source UI framework developed by Google that enables developers to create cross-platform applications from a single codebase. It provides a rich set of pre-designed widgets and tools that facilitate the rapid development of visually appealing and highly responsive user interfaces. Flutter leverages Dart as its core language, allowing developers to benefit from Dart’s fast compilation and expressive syntax while building seamless and native-like applications.
+        Flutter is an open-source UI framework by Google that enables cross-platform application development from a single codebase. It provides a rich set of customizable widgets and tools for building responsive, visually appealing UIs, using Dart for fast compilation and expressive syntax.
+        A key feature of Flutter is Hot Reload, which lets developers instantly see code changes and boosts productivity. Its layered architecture offers fine-grained control over rendering and performance. With strong third-party package support and a rapidly growing ecosystem, Flutter has become a popular choice for efficient, flexible, and high-quality cross-platform development.
         
-        One of Flutter’s most notable features is its Hot Reload capability, which allows developers to instantly view code changes without restarting the app, significantly enhancing productivity. Additionally, Flutter’s layered architecture—comprising the framework, engine, and embedding layers—offers fine-grained control over UI rendering and performance optimization. The framework’s growing ecosystem and extensive support for third-party packages make it highly adaptable for projects ranging from prototypes to large-scale enterprise applications. Because of its efficiency, flexibility, and elegant design system, Flutter has rapidly become one of the most popular frameworks for modern cross-platform development.
-        \vspace{0.5em}
+        \break
     
         \item Spring Boot \par
-        \vspace{0.5em}
+        \begin{figure}[h]
+            \centering
+            \includegraphics[width=0.2\textwidth]{images/logo/springboot_logo.png}
+            \caption{Spring Boot}
+            \label{fig:Spring Boot}
+        \end{figure}
     
         Spring Boot is a powerful framework that simplifies the development of Java-based web applications and microservices. It builds on the Spring framework by providing automatic configuration, embedded servers, and production-ready features out of the box. With built-in starter dependencies, developers can quickly set up projects without dealing with complex configuration files.
         Spring Boot also offers tools for monitoring, health checks, and performance management, making it easy to deploy and maintain scalable applications. Its seamless integration with the broader Spring ecosystem—such as Spring Security, Spring Data, and Spring Cloud—enables efficient development of secure, data-driven, and distributed systems. By reducing boilerplate code and configuration overhead, Spring Boot allows developers to focus on writing business logic and delivering high-quality, maintainable software.
         \vspace{0.5em}
         \end{enumerate}
     
-    \item Library \par
-    \vspace{0.5em}
     
-        \vspace{0.5em}
     
-        \begin{enumerate}[label=\arabic*)]
-        \item Hugging Face Transformers Library \par
-        \vspace{0.5em}
-    
-        The Hugging Face Transformers Library is a widely adopted and powerful framework for natural language processing (NLP) tasks. It offers an extensive collection of pretrained transformer-based models, including well-known architectures such as BERT, GPT, and T5, which can perform a variety of language-related tasks such as text classification, machine translation, summarization, and question answering.
-    
-        One of the library’s greatest strengths lies in its intuitive and user-friendly API, which allows developers to integrate state-of-the-art models into applications with minimal configuration. Furthermore, the library supports fine-tuning, enabling users to adapt pretrained models to domain-specific datasets and tasks, thereby achieving higher accuracy and relevance.
-    
-        The Transformers Library is also highly versatile, offering seamless compatibility with major deep learning frameworks such as PyTorch and TensorFlow. Backed by comprehensive documentation and an active open-source community, Hugging Face has become a cornerstone in both academic research and industrial applications. Its robust ecosystem continues to simplify the development and deployment of cutting-edge NLP solutions, making it a central tool in modern artificial intelligence.
-        \vspace{0.5em}
-    
-        \item PyTorch\par
-        \vspace{0.5em}
-    
-        PyTorch is an open-source machine learning and deep learning library that has gained widespread popularity among researchers and developers for its flexibility and ease of use. Built primarily for Python, PyTorch provides a dynamic computational graph, allowing developers to construct, modify, and debug neural network architectures in an intuitive and interactive manner without compromising speed or efficiency.
-    
-        The framework’s extensive ecosystem of tools and libraries supports every stage of the deep learning workflow—from data preprocessing and model training to evaluation and deployment in production environments. Its seamless integration with GPU acceleration, coupled with high-level APIs, enables efficient experimentation and rapid prototyping of complex models.
-    
-        Moreover, PyTorch benefits from a strong and active open-source community, continuous innovation, and frequent updates that keep it at the forefront of modern deep learning research. Today, it stands as one of the most influential frameworks powering AI applications, academic research, and large-scale industry deployments across the globe.
-        \vspace{0.5em}
-        \item Microsoft Azure Digital Twins\par
-        \vspace{0.5em}
-    
-        Microsoft Azure Digital Twins is a comprehensive Internet of Things (IoT) platform that enables the creation of digital replicas of real-world systems, environments, and assets. By modeling physical entities and their relationships in a virtual environment, Azure Digital Twins allows organizations to simulate, monitor, and optimize complex systems in real time. This digital representation facilitates data-driven decision-making by providing a unified view of physical operations and enabling predictive insights through continuous data synchronization from IoT devices and sensors.
-    
-        The platform leverages the Azure Digital Twins Definition Language (DTDL) to define entities, interactions, and behaviors, allowing developers to construct rich and flexible digital models. Through seamless integration with other Azure services—such as Azure IoT Hub, Time Series Insights, and Azure Machine Learning—it supports large-scale data ingestion, analytics, and AI-driven optimization.
-    
-        Azure Digital Twins is particularly effective in industries such as manufacturing, smart buildings, energy management, and urban planning, where real-time system visualization and predictive maintenance are crucial. By bridging the gap between the physical and digital worlds, the platform empowers organizations to enhance operational efficiency, reduce costs, and accelerate innovation through intelligent digital simulations.
-        \vspace{0.5em}
-        \end{enumerate}
-    
-    \item Cloud Platform \par
-    \vspace{0.5em}
-    
-        \vspace{0.5em}
-    
-        \begin{enumerate}[label=\arabic*)]
-        \item AWS EC2 (Elastic Compute Cloud) \par
-        \vspace{0.5em}
-        
-    
-        Amazon Web Services (AWS) Elastic Compute Cloud (EC2) is a fundamental component of Amazon’s cloud computing ecosystem, offering scalable and flexible computing resources in the cloud. It enables users to deploy and manage virtual servers—known as instances—providing secure and resizable compute capacity for running a wide range of applications and services.
-        
-        EC2 supports various instance types optimized for different workloads, including compute-optimized, memory-optimized, and general-purpose configurations. It also provides advanced features such as auto-scaling, which dynamically adjusts computing power to meet fluctuating demand, and load balancing, which efficiently distributes incoming traffic across multiple instances. Additionally, Amazon Virtual Private Cloud (VPC) integration enhances network isolation and security for cloud environments.
-        
-        Operating on a pay-as-you-go pricing model, EC2 allows organizations to optimize costs by paying only for the compute capacity they consume. With its high reliability, global infrastructure, and consistent performance, AWS EC2 serves as the backbone for many cloud-based applications, enabling businesses to deploy, scale, and maintain their computing resources with exceptional efficiency and flexibility.
-        \vspace{0.5em}
-        
-        \item AWS SageMaker\par
-        \vspace{0.5em}
-    
-        Amazon SageMaker is a fully managed machine learning (ML) service within the Amazon Web Services (AWS) ecosystem that simplifies and accelerates the end-to-end process of building, training, and deploying ML models at scale. It provides an integrated development environment equipped with tools for data preparation, model creation, training, and evaluation, supporting widely used frameworks such as TensorFlow, PyTorch, and Scikit-learn.
-        
-        SageMaker offers a comprehensive suite of advanced features, including automatic model tuning (hyperparameter optimization) and distributed training, which enhance both efficiency and performance during development. For deployment, the platform supports multiple options such as real-time inference endpoints, batch processing, and edge deployment, providing flexibility to meet diverse production needs.
-        
-        By integrating seamlessly with other AWS services—such as S3 (storage), IAM (security), and AWS Data Pipeline—SageMaker enables organizations to focus on model innovation while relying on a secure, scalable, and cost-effective infrastructure. As a result, it has become one of the most widely adopted platforms for enterprise-scale machine learning operations (MLOps), bridging the gap between research and real-world AI deployment.
-        \end{enumerate}
 
     \item Development Environment \par
     \vspace{0.5em}
@@ -537,118 +605,1602 @@ By operating entirely on local infrastructure, it not only eliminates third-part
     \end{enumerate}
         
     \end{enumerate}
+    \break
 
     \subsection{Software in use}
     \vspace{0.5em}
 
     \begin{enumerate}[label=\arabic*)]
     \item Visual Studio Code (VS Code) \par
+        
+        \begin{figure}[h]
+            \centering
+            \includegraphics[width=0.2\textwidth]{images/logo/vscode_logo.png}
+            \caption{VS Code}
+            \label{fig:VS Code}
+        \end{figure}
+    
+        Visual Studio Code (VS Code) is a flexible, open-source code editor known for strong performance and broad language support. It includes an integrated terminal, debugging tools, and Git features, making it a capable environment for both solo and team development.
+
+        Its extensible plugin ecosystem allows developers to tailor workflows to different languages and frameworks, while IntelliSense provides intelligent code completion and real-time error checking. With its intuitive interface and customizable settings, VS Code has become one of the most widely used tools in modern software engineering.
+        \vspace{0.5em}
+    
+    \item MQTT Broker \par
     \vspace{0.5em}
+        \begin{figure}[h]
+            \centering
+            \includegraphics[width=0.3\textwidth]{images/logo/mqtt_logo.png}
+            \caption{MQTT Broker}
+            \label{fig:MQTT Broker}
+        \end{figure}
+    
+        The MQTT Broker serves as the core messaging infrastructure of our system, enabling lightweight, low-latency communication between the edge gateway, backend server, and AI inference module. MQTT follows a publish–subscribe architecture, allowing devices to exchange data asynchronously with minimal network overhead—an essential requirement for IoT environments with constrained bandwidth.
+        
+        In SafeOn, the broker receives flow-level telemetry published by OpenWrt and relays it to the backend for storage and analysis. Its ability to handle persistent sessions, Quality of Service (QoS) levels, and scalable topic management ensures reliable data transmission even under intermittent connectivity. This makes MQTT a critical component for achieving real-time monitoring and responsive anomaly detection.
+        \vspace{0.5em}
 
-    Visual Studio Code (VS Code) is a powerful, open-source source code editor developed by Microsoft, widely recognized for its flexibility, performance, and extensive language support. It provides built-in features such as an integrated terminal, debugging tools, and Git version control, making it a comprehensive development environment suitable for both individual and collaborative projects.
-
-    One of VS Code’s most notable strengths lies in its extensible architecture, supported by a rich marketplace of plugins and extensions that enable developers to customize their workflow across various programming languages and frameworks. Features like IntelliSense deliver intelligent code completion, real-time syntax checking, and context-aware suggestions, significantly enhancing coding efficiency and accuracy.
-
-    The editor’s intuitive interface and highly configurable settings allow users to personalize their workspace to fit specific project needs and preferences. By combining versatility, productivity, and ease of use, Visual Studio Code has become one of the most widely adopted development tools in modern software engineering.
+    \item OpenWrt \par
     \vspace{0.5em}
+        \begin{figure}[h]
+            \centering
+            \includegraphics[width=0.2\textwidth]{images/logo/openwrt_logo.png}
+            \caption{OpenWrt}
+            \label{fig:OpenWrt}
+        \end{figure}
+        
+        OpenWrt is a Linux-based embedded operating system widely used for routers and edge devices, providing a highly customizable and extensible platform for network management. It offers full root-level access, a package-based architecture, and powerful networking utilities, making it suitable for advanced routing, monitoring, and packet inspection tasks.
+        
+        In our system, OpenWrt operates as the edge security gateway responsible for capturing raw IoT traffic, extracting flow metadata, and publishing telemetry to the MQTT Broker. Its lightweight footprint and robustness enable real-time processing directly at the network boundary, reducing latency and improving the responsiveness of SafeOn’s anomaly detection pipeline.
+        \vspace{0.5em}
+
+    \item TCPDump \par
+    \vspace{0.5em}
+        \begin{figure}[h]
+            \centering
+            \includegraphics[width=0.2\textwidth]{images/logo/tcpdump_logo.png}
+            \caption{TCPDump}
+            \label{fig:TCPDump}
+        \end{figure}
+    
+        TCPDump is a command-line packet capture tool capable of intercepting and analyzing raw network traffic at the packet level. It provides fine-grained access to headers and payloads, supporting various filtering expressions to isolate specific protocols, ports, or device traffic.
+        
+        Within SafeOn, TCPDump runs on OpenWrt to record network activity from IoT devices, generating the packet streams used to construct flow-level features for downstream machine learning analysis. Its reliability, efficiency, and ability to operate in resource-constrained environments make it an ideal choice for continuous monitoring in home IoT networks.
+        \vspace{0.5em}
+
+    \item PyTorch\par
+    \vspace{0.5em}
+        \begin{figure}[h]
+            \centering
+            \includegraphics[width=0.2\textwidth]{images/logo/pytorch_logo.png}
+            \caption{PyTorch}
+            \label{fig:PyTorch}
+        \end{figure}
+    
+        PyTorch is a widely used open-source deep learning library known for its flexibility and intuitive design. Built for Python, it offers a dynamic computational graph that makes constructing and debugging neural networks straightforward while maintaining strong performance.
+
+        Its ecosystem includes tools for data processing, training, evaluation, and deployment, all with seamless GPU acceleration for fast experimentation. Supported by an active open-source community and frequent updates, PyTorch remains a leading framework in modern AI research and real-world applications.
+        
+        \break
+
+    \item scikit-learn \par
+    \vspace{0.5em}
+        \begin{figure}[h]
+            \centering
+            \includegraphics[width=0.2\textwidth]{images/logo/scikitlearn_logo.png}
+            \caption{scikit-learn}
+            \label{fig:scikit-learn}
+        \end{figure}
+    
+        Scikit-learn is a widely adopted machine learning library in Python, offering efficient implementations of classical algorithms for classification, clustering, and anomaly detection. Its simple API and strong integration with NumPy and SciPy enable rapid experimentation and prototyping.
+        
+        In this project, scikit-learn provides models such as Isolation Forest for snapshot-level flow anomaly detection, serving as a lightweight and interpretable baseline for identifying irregular device behavior. Its consistent performance and ease of deployment make it well-suited for real-time inference within the SafeOn architecture.
+        \vspace{0.5em}
+
 
     \item Vim \par
     \vspace{0.5em}
-    
+        \begin{figure}[h]
+            \centering
+            \includegraphics[width=0.2\textwidth]{images/logo/vim_logo.png}
+            \caption{Vim}
+            \label{fig:Vim}
+        \end{figure}
 
-    Vim is a highly efficient, keyboard-centric text editor renowned for its speed, precision, and flexibility. Built upon the legacy of the original Vi editor, Vim introduces a modal editing system that separates tasks into distinct modes—such as insert, command, and visual—allowing developers to perform text manipulation and navigation with exceptional speed and accuracy.
-    
-    Although Vim presents a steeper learning curve compared to conventional editors, many developers find that mastering its commands and shortcuts greatly enhances overall productivity and editing efficiency. Its lightweight design and terminal-based operation make it particularly well-suited for remote development, server environments, and quick file modifications across multiple projects.
-    
-    By emphasizing efficiency through keystroke-driven control, Vim remains an indispensable tool for developers who prioritize speed, focus, and minimalism in their workflow.
-    \vspace{0.5em}
+        Vim is a highly efficient, keyboard-centric text editor renowned for its speed, precision, and flexibility. Built upon the legacy of the original Vi editor, Vim introduces a modal editing system that separates tasks into distinct modes—such as insert, command, and visual—allowing developers to perform text manipulation and navigation with exceptional speed and accuracy.
+        
+        Although Vim presents a steeper learning curve compared to conventional editors, many developers find that mastering its commands and shortcuts greatly enhances overall productivity and editing efficiency. Its lightweight design and terminal-based operation make it particularly well-suited for remote development, server environments, and quick file modifications across multiple projects.
+        
+        By emphasizing efficiency through keystroke-driven control, Vim remains an indispensable tool for developers who prioritize speed, focus, and minimalism in their workflow.
+        \vspace{0.5em}
 
     \item Figma \par
     \vspace{0.5em}
+        \begin{figure}[h]
+            \centering
+            \includegraphics[width=0.2\textwidth]{images/logo/figma_logo.png}
+            \caption{Figma}
+            \label{fig:Figma}
+        \end{figure}
 
-    Figma serves as the primary tool for UI/UX design within our project, providing a powerful web-based platform that supports real-time collaboration among team members. It streamlines the entire design workflow—from wireframing and interface design to interactive prototyping—all within a single integrated environment.
-    
-    One of Figma’s key advantages lies in its design system management capabilities, which enable teams to maintain visual consistency across all components while efficiently managing reusable UI elements. Developers can easily extract CSS values, assets, and component specifications, facilitating a smooth transition from design to implementation.
-    
-    Moreover, Figma’s component-based design approach aligns naturally with React Native’s component architecture, fostering a seamless connection between the design and development phases. By combining collaboration, flexibility, and scalability, Figma has become an indispensable tool for modern UI/UX workflows and cross-functional product teams.
-    \vspace{0.5em}
+        Figma is a web-based UI/UX design platform that supports real-time collaboration and streamlines the workflow from wireframing to interactive prototyping. Its design system features help maintain visual consistency and manage reusable components efficiently.
+
+        Developers can easily extract assets and specifications, enabling a smooth handoff to implementation. With its component-based approach and strong alignment with frameworks like React Native, Figma has become an essential tool for modern, collaborative design teams.
+        \vspace{0.5em}
     
     \item Xcode 16.4 \par
     \vspace{0.5em}
+        \begin{figure}[h]
+            \centering
+            \includegraphics[width=0.2\textwidth]{images/logo/xcode_logo.png}
+            \caption{Xcode 16.4}
+            \label{fig:Xcode 16.4}
+        \end{figure}
 
-    Xcode 16.4 is the latest integrated development environment (IDE) from Apple, serving as a cornerstone for iOS, iPadOS, macOS, watchOS, and tvOS application development. It includes the iOS 18.5 SDK and offers a complete suite of tools for building, testing, debugging, and deploying applications across Apple’s ecosystem. With its real-time iOS Simulator, developers can test applications seamlessly across multiple device types and operating system versions.
-    
-    In React Native projects, Xcode 16.4 plays a critical role in generating iOS builds, managing signing certificates, and performing platform-specific debugging to ensure smooth interoperability between native and cross-platform components. The IDE also features enhanced performance profiling, memory diagnostics, and UI testing tools that help developers optimize efficiency and reliability.
-    
-    Moreover, Xcode 16.4 improves overall developer productivity with faster build times, refined Swift and SwiftUI support, and deeper integration with TestFlight and App Store Connect for streamlined distribution. Through its robust toolchain and continuous updates, Xcode remains the essential environment for creating high-performance, production-ready iOS applications.
-    \vspace{0.5em}
+        Xcode 16.4 is Apple’s integrated development environment for building, testing, and deploying apps across iOS, iPadOS, macOS, watchOS, and tvOS. It includes the iOS 18.5 SDK and provides tools such as the real-time iOS Simulator, performance profiling, memory diagnostics, and UI testing.
+
+        In React Native projects, Xcode is essential for generating iOS builds, managing signing certificates, and debugging native components. Faster build times, improved Swift/SwiftUI support, and integration with TestFlight and App Store Connect further enhance developer productivity. Xcode remains the core environment for creating reliable, production-ready applications on Apple platforms.
+        \vspace{0.5em}
 
     \item PostgreSQL \par
     \vspace{0.5em}
+        \begin{figure}[h]
+            \centering
+            \includegraphics[width=0.2\textwidth]{images/logo/postgresql_logo.png}
+            \caption{PostgreSQL}
+            \label{fig:PostgreSQL}
+        \end{figure}
 
-    PostgreSQL is a powerful, open-source relational database management system (RDBMS) known for its reliability, extensibility, and advanced feature set. It offers full SQL compliance along with modern capabilities such as window functions, JSON support, and geospatial data handling through PostGIS.
+        PostgreSQL is a robust open-source relational database known for reliability, extensibility, and full SQL compliance. It supports advanced features such as window functions, JSON operations, and geospatial data through PostGIS.
 
-    With strong ACID compliance and Multiversion Concurrency Control (MVCC), PostgreSQL ensures consistent, high-performance transaction processing even under heavy workloads. It supports replication, partitioning, and high availability, making it suitable for large-scale and mission-critical systems.
-    
-    PostgreSQL’s extensible architecture allows developers to define custom data types, operators, and functions, while robust security features like role-based access control and SSL/TLS encryption help safeguard data integrity. These strengths make PostgreSQL a preferred choice for modern, data-intensive applications that demand both flexibility and stability.
-    \vspace{0.5em}
+        With ACID guarantees and MVCC, PostgreSQL delivers consistent, high-performance transaction processing and supports replication, partitioning, and high availability for large-scale systems. Its extensible design allows custom data types and functions, while strong security features—including role-based access control and SSL/TLS—ensure data integrity. These capabilities make PostgreSQL a trusted choice for modern, data-intensive applications.
+        \vspace{0.5em}
 
     \item  TimescaleDB \par
-    \vspace{0.5em}
+        \vspace{0.5em}
+        \begin{figure}[h]
+            \centering
+            \includegraphics[width=0.2\textwidth]{images/logo/timescale_logo.png}
+            \caption{TimescaleDB}
+            \label{fig:TimescaleDB}
+        \end{figure}
+    
+        TimescaleDB is an open-source time-series database built on PostgreSQL, designed to efficiently store and analyze large volumes of time-stamped data. It combines PostgreSQL’s reliability with optimized time-series features, making it well suited for IoT monitoring, system metrics, and sensor telemetry.
 
-    TimescaleDB is an open-source time-series database built as an extension of PostgreSQL, designed to efficiently store, query, and analyze time-stamped data at scale. It combines the reliability and robustness of relational databases with the performance and scalability of time-series systems, making it ideal for use cases such as IoT data monitoring, financial analytics, system metrics, and sensor telemetry.
-    
-    Leveraging PostgreSQL’s mature ecosystem, TimescaleDB supports full SQL compatibility, enabling developers to use familiar relational queries while taking advantage of powerful time-series functions such as continuous aggregates, data retention policies, and hypertables for automatic data partitioning. These features allow for efficient handling of large, high-ingest datasets without compromising performance.
-    
-    TimescaleDB also integrates seamlessly with Grafana, Prometheus, and other visualization or monitoring tools, providing a complete stack for real-time analytics and observability. Its focus on scalability, flexibility, and ease of integration has established TimescaleDB as a leading solution for managing temporal and high-frequency data in modern data-driven applications.
-    \vspace{0.5em}
+        With full SQL compatibility, TimescaleDB offers powerful tools such as hypertables, continuous aggregates, and automated data retention, enabling high-ingest performance without complex configuration. It also integrates smoothly with visualization tools like Grafana and Prometheus, providing a complete environment for real-time analytics. Its scalability and ease of integration make it a strong solution for modern time-series workloads.
+        \vspace{0.5em}
 
-     \item  Discord \par
-    \vspace{0.5em}
+    \item  Discord \par
 
-    Discord is a widely used communication and collaboration platform originally developed for gaming communities but now adopted across diverse fields, including education, software development, and professional teamwork. It provides real-time voice, video, and text communication, enabling teams to coordinate efficiently regardless of location.
-    
-    One of Discord’s greatest strengths lies in its server-based architecture, which allows users to create organized spaces with multiple channels dedicated to specific topics or projects. This structure facilitates clear communication, task management, and community engagement within development teams or organizations.
-    
-    Discord also offers a robust API and bot integration system, allowing developers to automate workflows, manage notifications, and integrate tools such as GitHub, Jenkins, or monitoring services directly into communication channels. Its cross-platform availability—spanning desktop, mobile, and web—ensures accessibility and continuity across devices.
-    
-    By combining reliability, customization, and ease of use, Discord has evolved into a versatile collaboration environment, supporting everything from project coordination and code reviews to community management and technical discussions in real time.
-    \vspace{0.5em}
+        \begin{figure}[h]
+            \centering
+            \includegraphics[width=0.2\textwidth]{images/logo/discord_logo.png}
+            \caption{Discord}
+            \label{fig:Discord}
+        \end{figure}
+        
+        Discord is a communication and collaboration platform that provides real-time voice, video, and text messaging, enabling teams to coordinate efficiently from anywhere. Its server-based structure organizes discussions into topic-specific channels, supporting clear communication and task management.
+
+        With robust API and bot integration, Discord allows automated workflows and integrations with tools like GitHub or Jenkins. Its cross-platform support ensures seamless access across devices.
+        Combining reliability, flexibility, and ease of use, Discord has become a versatile environment for project collaboration, technical discussions, and community management.
+
+        \break
 
     \item GitHub\par
-    \vspace{0.5em}
 
-    GitHub is a web-based Git version control and collaboration platform that enables developers to host, share, and manage code repositories efficiently. It provides essential features such as pull requests, issue tracking, and code reviews, fostering seamless collaboration and transparency within development teams.
-    
-    Beyond version control, GitHub integrates powerful automation and CI/CD capabilities through GitHub Actions, allowing developers to automate build, test, and deployment workflows directly within their repositories. It also offers built-in documentation tools, project boards, and discussion spaces, enabling comprehensive project management and knowledge sharing in one platform.
-    
-    GitHub supports branching and forking workflows, allowing teams to work in parallel and safely merge contributions through structured review processes. With extensive integration options for popular development tools and strong security features such as dependency scanning and secret detection, GitHub provides a robust and secure environment for software development.
-    
-    Adopted globally by both individuals and large enterprises, GitHub has become a cornerstone of modern software engineering, unifying collaboration, automation, and code management in a single ecosystem.
-    \vspace{0.5em}
+        \begin{figure}[h]
+            \centering
+            \includegraphics[width=0.2\textwidth]{images/logo/github_logo.png}
+            \caption{GitHub}
+            \label{fig:GitHub}
+        \end{figure}
+
+        GitHub is a web-based platform for Git version control that allows developers to host, share, and collaborate on code efficiently. It supports pull requests, issue tracking, and code reviews, enabling transparent teamwork.
+
+        Beyond version control, GitHub provides CI/CD automation through GitHub Actions, project boards for organization, and security features like dependency scanning and secret detection.
+        Used widely across industry and open-source communities, GitHub has become a core tool for modern software development.
+        \vspace{0.5em}
 
     \item Overleaf \par
-    \vspace{0.5em}
 
-    Overleaf is a web-based LaTeX editing and collaboration platform designed to simplify the process of creating and managing scientific and technical documents. It enables real-time collaboration, allowing multiple users to edit the same document simultaneously while automatically synchronizing changes across all participants.
+        \begin{figure}[h]
+            \centering
+            \includegraphics[width=0.2\textwidth]{images/logo/overleaf_logo.png}
+            \caption{Overleaf}
+            \label{fig:Overleaf}
+        \end{figure}
+
+        Overleaf is a web-based LaTeX editing platform that simplifies the creation and management of scientific documents. It supports real-time collaboration, allowing multiple users to edit simultaneously with automatic synchronization. The platform includes built-in compilation, syntax highlighting, auto-completion, and instant PDF previews, removing the need for local LaTeX installations.
     
-    The platform provides a full LaTeX environment with built-in compilation, eliminating the need for local installations or manual configuration. It offers features such as syntax highlighting, auto-completion, error detection, and instant PDF preview, enhancing both the accuracy and efficiency of document creation. Additionally, Overleaf includes a rich collection of templates for academic papers, reports, theses, and presentations, making it accessible for users across various disciplines.
-    
-    Overleaf also supports version control and integrates seamlessly with reference management tools like Zotero and Mendeley, streamlining the citation and bibliography workflow. With comprehensive documentation and tutorials, Overleaf has become an essential platform for academic writing, research collaboration, and professional publication, bridging the gap between technical precision and collaborative efficiency.
-    \vspace{0.5em}
+        With a wide range of academic templates and seamless integration with tools like Zotero and Mendeley, Overleaf streamlines citation management and document organization. Its accessibility, collaboration features, and comprehensive LaTeX environment make it a widely used tool for academic writing and research.
+        \vspace{0.5em}
 
     \item Notion\par
-    \vspace{0.5em}
 
-    Notion is a collaborative workspace that combines document management, note-taking, and project organization tools. Its block-based structure allows users to create and arrange various content types within a hierarchical page system. The platform offers templates for different purposes and real-time collaboration features. Notion includes database capabilities, version history, and integration options with external tools. The flexible interface lets users customize their workspace organization and layout to match specific workflows.
-    \vspace{0.5em}
+        \begin{figure}[h]
+            \centering
+            \includegraphics[width=0.2\textwidth]{images/logo/notion_logo.png}
+            \caption{Notion}
+            \label{fig:Notion}
+        \end{figure}
+
+        Notion is a collaborative workspace that combines document management, note-taking, and project organization tools. Its block-based structure allows users to create and arrange various content types within a hierarchical page system. The platform offers templates for different purposes and real-time collaboration features. Notion includes database capabilities, version history, and integration options with external tools. The flexible interface lets users customize their workspace organization and layout to match specific workflows.
+        \vspace{0.5em}
 
     \item ChatGPT\par
-    \vspace{0.5em}
-    ChatGPT is an OpenAI language model that functions as a conversational AI assistant and customizable model platform. Based on transformer architecture and extensive training data, it handles diverse tasks from answering questions to coding assistance. The system maintains contextual awareness in conversations and generates responses according to its training. It features multilingual support, adaptable communication styles, and capabilities in summarization, translation, and creative writing. ChatGPT includes safety measures and clearly indicates its knowledge limitations through its training cutoff date.
-    \vspace{0.5em}
+
+        \begin{figure}[h]
+            \centering
+            \includegraphics[width=0.2\textwidth]{images/logo/chatgpt_logo.png}
+            \caption{ChatGPT}
+            \label{fig:ChatGPT}
+        \end{figure}
+    
+        ChatGPT is an OpenAI language model that functions as a conversational AI assistant and customizable model platform. Based on transformer architecture and extensive training data, it handles diverse tasks from answering questions to coding assistance. The system maintains contextual awareness in conversations and generates responses according to its training. It features multilingual support, adaptable communication styles, and capabilities in summarization, translation, and creative writing. ChatGPT includes safety measures and clearly indicates its knowledge limitations through its training cutoff date.
+        \vspace{0.5em}
 
     \end{enumerate}
+
+    \subsection{Hardware \& Runtime Environment}
+    \vspace{0.5em}
+
+    \begin{enumerate}[label=\arabic*)]
+    
+    \item Raspberry Pi (Edge Gateway) \par
+    \vspace{0.5em}
+    
+        The Raspberry Pi serves as the edge gateway for the SafeOn system, operating as the central hub for network monitoring within the home environment. Its low-power ARM architecture, sufficient processing capability, and strong compatibility with embedded Linux systems make it suitable for continuous packet capture and lightweight computation tasks. Running OpenWrt, the device performs TCP-based traffic collection, real-time flow generation, and MQTT-based telemetry publishing to the backend server. By functioning as a dedicated security node independent of the main router, the Raspberry Pi ensures reliable, localized threat detection and minimizes latency in end-to-end communication.
+        \vspace{1em}
+
+    \item IoT Devices (ESP32-CAM) \par
+    \vspace{0.5em}
+
+        Various IoT devices within the home network serve as data sources for the SafeOn monitoring pipeline. Devices such as the Ecovacs robot vacuum and the ESP32-CAM module generate traffic patterns that reflect typical household IoT behavior. The ESP32-CAM, in particular, produces high-frequency video-stream data, enabling the system to analyze heavy-flow conditions, motion-triggered events, and API communication patterns. These devices provide diverse network activities that support accurate modeling of normal and anomalous behavior, forming the basis for flow-level anomaly detection and device fingerprinting.
+        \vspace{1em}
+
+    \item Router \par
+    \vspace{0.5em}
+
+    The home router establishes the local network environment and provides the upstream internet connection for all IoT devices. While it performs standard network functions such as DHCP, NAT, and wireless access management, the SafeOn architecture delegates security monitoring to the Raspberry Pi gateway to avoid router performance bottlenecks. The router ensures stable routing paths for device communication, while the edge gateway intercepts and processes traffic passively, enabling non-intrusive, real-time network analysis without modifying the router's firmware or configuration.
+    
+\end{enumerate}
+
+    \subsection{Computer resources}
+    \vspace{0.5em}
+
+        \setlength{\textfloatsep}{8pt}
+        \setlength{\floatsep}{6pt}
+        \setlength{\intextsep}{6pt}
+        
+        \begin{table}[H]
+            \caption{Computer resources}
+            \centering
+            \footnotesize
+            \renewcommand{\arraystretch}{1.2}
+                \begin{tabular}{|p{2.7cm}|p{4cm}|}
+                    \hline
+                    \textbf{Name} & \textbf{Task} \\ \hline
+                    Jaemin Jeong & Apple M2 16GB RAM \\ \hline
+                    Juseong Jeon & Linux mint AMD 8GB \\ \hline
+                    Wonyoung Shin & Apple M4 16GB RAM \\ \hline
+                    Seungmin Son & Apple M4 16GB RAM \\ \hline
+                \end{tabular}
+            \label{tab:resources}
+        \end{table}
+
+
+
+    \subsection{Task distribution}
+    
+    \setlength{\textfloatsep}{8pt}
+    \setlength{\floatsep}{6pt}
+    \setlength{\intextsep}{6pt}
+    
+    \begin{table}[H]
+        \caption{Task distribution}
+        \centering
+        \footnotesize
+        \renewcommand{\arraystretch}{1.2}
+            \begin{tabular}{|p{2.7cm}|p{4cm}|}
+                \hline
+                \textbf{Name} & \textbf{Task} \\ \hline
+                Jaemin Jeong & Back-end Development \\ \hline
+                Juseong Jeon & Security Development \\ \hline
+                Wonyoung Shin & Front-end, ML Development \\ \hline
+                Seungmin Son & ML Development \\ \hline
+            \end{tabular}
+        \label{tab:roles}
+    \end{table}
+    \newpage
+
+
+    \section{Requirement Specification}
+    \vspace{0.5em}
+
+    \subsection{User-Facing Functional Specifications}
+    \vspace{0.3em}
+
+    \subsubsection{1) Entry}
+
+        \begin{figure}[h]
+            \centering
+            \includegraphics[width=0.2\textwidth]{images/app/entry.png}
+            \caption{Entry}
+            \label{fig:Entry}
+        \end{figure}
+
+        \begin{table}[h]
+        \centering
+        \begin{tabular}{|p{0.4cm}|p{1.2cm}|p{6cm}|}
+        \hline
+        \textbf{ID} & \textbf{Name} & \textbf{Description} \\ \hline
+        001 & SafeOn-Entry-Page &
+        The user is introduced to the SafeOn service and can proceed by tapping the Start button. This page serves as the entry point to the authentication flow. \\ \hline
+        \end{tabular}
+        \end{table}
+
+    
+    \subsubsection{2) User Authentication Screens}
+    \vspace{0.5em}
+    \begin{enumerate}
+
+    \item Sign-up Page
+        \begin{figure}[h]
+            \centering
+            \includegraphics[width=0.2\textwidth]{images/app/signup.png}
+            \caption{Sign-up}
+            \label{fig:Sign-up}
+        \end{figure}
+
+        \begin{table}[h]
+        \centering
+        \begin{tabular}{|p{0.4cm}|p{1.5cm}|p{6cm}|}
+        \hline
+        \textbf{ID} & \textbf{Name} & \textbf{Description} \\ \hline
+        002 & SafeOn-Signup-Page &
+        The user provides email, password, nickname, and privacy agreement. On success, a new account is created in the backend. \\ \hline
+        003 & SafeOn-Signup-Email & The email address is a required field used as the user’s unique identifier. It must include a valid format with ‘@’ and domain, and the system checks for duplicates in real time. Errors such as “Please enter a valid email address” or “This email is already in use” are shown for invalid or duplicate inputs. \\ \hline
+        004 & SafeOn-Signup-Password & The password is a mandatory field for securing the user’s account. It must meet SafeOn’s password policy, including minimum length and valid character composition. If the input is invalid, the system shows messages like “Password does not meet security requirements.” \\ \hline
+        005 & SafeOn-Signup-Username & The username is a required profile identifier that must follow allowed character rules and remain unique. Invalid or duplicate entries trigger messages such as “Please enter a valid username” or “This username is already taken.” \\ \hline
+        006 & SafeOn-Signup-Privacy-Agreement & The privacy agreement is a required consent field for creating an account. If the user does not agree, the system blocks signup and displays guidance such as “You must agree to the privacy policy to continue.” \\ \hline
+        \end{tabular}
+        \end{table}
+        \break
+
+
+    \item Login Page
+        \begin{figure}[h]
+            \centering
+            \includegraphics[width=0.2\textwidth]{images/app/login.png}
+            \caption{Login}
+            \label{fig:Login}
+        \end{figure}
+        
+
+        \begin{table}[h]
+        \centering
+        \begin{tabular}{|p{0.4cm}|p{1.2cm}|p{6cm}|}
+        \hline
+        \textbf{ID} & \textbf{Name} & \textbf{Description} \\ \hline
+        007 & SafeOn-Login-Page &
+        The user enters email and password to authenticate.  
+        Successful login returns a JWT token used for all subsequent API calls. \\ \hline
+        008 & SafeOn-Login-Success &
+        Successful login occurs when the user provides valid email and password credentials. Upon verification, the system issues a JWT token, which is required for all subsequent authenticated requests. The user is then redirected to the main dashboard.
+         \\ \hline
+        009 & SafeOn-Login-Failure &
+        Login failure occurs when the provided credentials do not match any registered account. The system displays error messages such as “Invalid email or password,” and authentication is denied. 
+         \\ \hline
+        \end{tabular}
+        \end{table}
+        \break
+
+    \subsubsection{3) Mainpage}
+
+
+        \begin{enumerate}
+            \item Mainpage DashBoard
+        
+            \begin{figure}[h]
+                \centering
+                \includegraphics[width=0.2\textwidth]{images/app/mainpage_dashboard.png}
+                \caption{ Mainpage DashBoard}
+                \label{fig: Mainpage DashBoard}
+            \end{figure}
+    
+                \begin{table}[h]
+                \centering
+                \begin{tabular}{|p{0.4cm}|p{1.5cm}|p{6cm}|}
+                \hline
+                \textbf{ID} & \textbf{Name} & \textbf{Description} \\ \hline
+                010 & SafeOn-Mainpage-DashBoard &
+                Displays weekly anomaly statistics by day and presents the overall security status of the network. Real-time updates are delivered through SSE, allowing users to monitor ongoing activity at a glance.
+                 \\ \hline
+                011 & SafeOn-Mainpage-devices &
+                Shows the number of active devices currently connected to the SafeOn router. Users can view device presence and network activity in real time.
+                 \\ \hline
+                012 & SafeOn-Mainpage-alarts &
+                Displays the cumulative number of anomaly alerts detected by the SafeOn system, providing users with a quick measure of recent security activity.
+                 \\ \hline
+                \end{tabular}
+                \end{table}
+            \break
+
+            \item Mainpage Filled DashBoard
+                \begin{figure}[h]
+                    \centering
+                    \includegraphics[width=0.2\textwidth]{images/app/mainpage_filled_dashboard.png}
+                    \caption{ Mainpage Filled DashBoard}
+                    \label{fig: Mainpage Filled DashBoard}
+                \end{figure}
+
+                \begin{table}[h]
+                    \centering
+                    \begin{tabular}{|p{0.4cm}|p{1.5cm}|p{6cm}|}
+                    \hline
+                    \textbf{ID} & \textbf{Name} & \textbf{Description} \\ \hline
+                    013 & SafeOn-Mainpage-Filled-Dashboard &
+                    Displays a fully populated dashboard view showing real-time system status, including the total number of registered devices, current network health, cumulative alert count, and recent alert activity. This view provides users with an at-a-glance summary of their smart-home security state based on the latest data received from the backend. \\ \hline
+                    \end{tabular}
+                \end{table}
+            \break
+            
+        \end{enumerate}
+
+        \subsubsection{4) Device Management Screens}
+        \vspace{0.5em}
+
+        \begin{enumerate}
+            \item Newly Discovered Device (Empty State)
+                \begin{figure}[h]
+                    \centering
+                    \includegraphics[width=0.2\textwidth]{images/app/device_new_wait.png}
+                    \caption{New Device Wait}
+                    \label{fig:New Device Wait}
+                \end{figure}
+
+                \begin{table}[h]
+                \centering
+                \begin{tabular}{|p{0.4cm}|p{1.5cm}|p{6cm}|}
+                \hline
+                \textbf{ID} & \textbf{Name} & \textbf{Description} \\ \hline
+                013 & SafeOn-Devicepage-EmptyState &
+                This screen appears when the Hub Agent has not detected any new devices. It informs the user that no discoverable devices are currently available and provides a “Refresh” button to request a new scan. The popup remains active and automatically updates when the Hub Agent reports a newly discovered device.
+                \\ \hline
+                \end{tabular}
+                \end{table}
+            \break    
+            
+            \item Newly Discovered Device (Detection State)
+                \begin{figure}[h]
+                    \centering
+                    \includegraphics[width=0.2\textwidth]{images/app/device_new_find.png}
+                    \caption{New Device Find}
+                    \label{fig:New Device Find}
+                \end{figure}
+
+                \begin{table}[h]
+                \centering
+                \begin{tabular}{|p{0.4cm}|p{1.8cm}|p{6cm}|}
+                \hline
+                \textbf{ID} & \textbf{Name} & \textbf{Description} \\ \hline
+                014 & SafeOn-Devicepage-DetectionState &
+                When the Hub Agent detects a new device on the network, the device is displayed along with its name, MAC address, and IP address.
+                \\ \hline
+                015 & SafeOn-Devicepage-RegisterDevice &
+                Selecting “Register” adds the device to the SafeOn device list. The backend records the device’s metadata, assigns it a unique identifier, and marks the device as trusted.
+                \\ \hline
+                \end{tabular}
+                \end{table}
+            \break
+
+            \item Device Block
+                \begin{figure}[h]
+                    \centering
+                    \includegraphics[width=0.2\textwidth]{images/app/device_block.png}
+                    \caption{Device Block}
+                    \label{fig:Device Block}
+                \end{figure}
+
+                \begin{table}[h]
+                    \centering
+                    \begin{tabular}{|p{0.4cm}|p{1.5cm}|p{6cm}|}
+                    \hline
+                    \textbf{ID} & \textbf{Name} & \textbf{Description} \\ \hline
+                    016 & SafeOn-Devicepage-BlockDevice &
+                    Choosing “Block” triggers the device-blocking workflow: The app sends a block request to the backend, which updates the OpenWrt firewall to deny the device’s network access. The device is not added to the trusted list and remains blocked, preventing unknown or suspicious devices from connecting to the smart-home network.
+                    \\ \hline
+                    \end{tabular}
+                \end{table}
+            \break
+                
+            
+            \item Registered Device List Page
+                \begin{figure}[h]
+                    \centering
+                    \includegraphics[width=0.2\textwidth]{images/app/device_connected.png}
+                    \caption{Connected Device List}
+                    \label{fig:Connected Device List}
+                \end{figure}
+
+                \begin{table}[h]
+                \centering
+                \begin{tabular}{|p{0.4cm}|p{1.5cm}|p{6cm}|}
+                \hline
+                \textbf{ID} & \textbf{Name} & \textbf{Description} \\ \hline
+                017 & SafeOn-Devicepage-Connected-List &
+                Shows all devices currently registered to the user’s SafeOn network. Each device card displays the device name, IP address, and real-time connection status. This page allows users to quickly verify active devices and manage their smart-home environment.
+                \\ \hline
+                \end{tabular}
+                \end{table}
+            \break
+            
+            \item Device Detail Page  
+            \vspace{1em}
+                \begin{enumerate}
+                    \item Device Information Section
+                        \begin{figure}[h]
+                            \centering
+                            \includegraphics[width=0.2\textwidth]{images/app/device_detail.png}
+                            \caption{Device Detail Information}
+                            \label{fig:Device Detail Information}
+                        \end{figure}
+
+                        \begin{table}[h]
+                        \centering
+                        \begin{tabular}{|p{0.4cm}|p{1.5cm}|p{6cm}|}
+                        \hline
+                        \textbf{ID} & \textbf{Name} & \textbf{Description} \\ \hline
+                        018 & SafeOn-Devicepage-Detail-Information &
+                        Provides key identification data for the device, including IP address, MAC address, registration time, and serial number. These details allow users to verify the device’s identity, based on authoritative information reported by the Hub Agent.
+                        \\ \hline
+                        \end{tabular}
+                        \end{table}
+                    \break
+
+                    \item Real-Time Traffic Monitoring Section
+                        \begin{figure}[h]
+                            \centering
+                            \includegraphics[width=0.2\textwidth]{images/app/device_detail_flow.png}
+                            \caption{Device Detail Flows}
+                            \label{fig:Device Detail Flows}
+                        \end{figure}
+
+                        \begin{table}[h]
+                        \centering
+                        \begin{tabular}{|p{0.4cm}|p{1.5cm}|p{6cm}|}
+                        \hline
+                        \textbf{ID} & \textbf{Name} & \textbf{Description} \\ \hline
+                        019 & SafeOn-Devicepage-Detail-Flows &
+                        Shows two flow-based charts visualizing the last 15 minutes of activity:
+                        \begin{itemize}                     
+                            \item PPS: current and peak packet rates
+                            \item BPS: current and peak bandwidth usage
+                        \end{itemize}
+                        The graphs update with recent edge-collected flow data and help detect abnormal patterns such as unexpected spikes or bursts.
+                        \\ \hline
+                        \end{tabular}
+                        \end{table}
+                        
+                    \end{enumerate}
+            \end{enumerate}
+            \break
+
+        \subsubsection{5) Alert Management Page}
+        \vspace{0.5em}
+
+        \begin{enumerate}
+            \item Alert List Page (Empty State)
+                \begin{figure}[h]
+                    \centering
+                    \includegraphics[width=0.2\textwidth]{images/app/alert_empty_list.png}
+                    \caption{Empty Alert List}
+                    \label{fig:Empty Alert List}
+                \end{figure}
+
+                \begin{table}[h]
+                \centering
+                \begin{tabular}{|p{0.4cm}|p{1.5cm}|p{6cm}|}
+                \hline
+                \textbf{ID} & \textbf{Name} & \textbf{Description} \\ \hline
+                020 & SafeOn-Alertpage-EmptyList &
+                Displayed when no anomaly events have been generated by the ML inference engine. The screen informs the user that there are currently no alerts and remains idle until a new anomaly is detected. This state provides a clean baseline view, indicating that the smart-home network is operating normally.
+                \\ \hline
+                \end{tabular}
+                \end{table}
+            \break
+                
+            \item Alert List Page (Filled State)
+                \begin{figure}[h]
+                    \centering
+                    \includegraphics[width=0.2\textwidth]{images/app/alert_filled_list.png}
+                    \caption{Filled Alert List}
+                    \label{fig:Filled Alert List}
+                \end{figure}
+
+                \begin{table}[h]
+                \centering
+                \begin{tabular}{|p{0.4cm}|p{1.5cm}|p{6cm}|}
+                \hline
+                \textbf{ID} & \textbf{Name} & \textbf{Description} \\ \hline
+                021 & SafeOn-Alertpage-FilledList &
+                Displays a chronological list of anomaly alerts generated by the ML engine. Each alert card shows the timestamp, risk level, and device information. Users can browse recent security events and select an entry to view its detailed information.
+                \\ \hline
+                022 & SafeOn-Alertpage-ReadStatus &
+                Provides a read/unread indicator for each alert. New alerts are marked as unread, and the status updates when the user opens or acknowledges the alert. This feature helps users distinguish newly generated events from previously reviewed ones.
+                \\ \hline
+                \end{tabular}
+                \end{table}
+            \break
+            
+            \item Alert Detail Page (Information)
+                \begin{figure}[h]
+                    \centering
+                    \includegraphics[width=0.2\textwidth]{images/app/alert_detail.png}
+                    \caption{Alert Detail Page}
+                    \label{fig:Alert Detail Page}
+                \end{figure}
+
+                \begin{table}[h]
+                \centering
+                \begin{tabular}{|p{0.4cm}|p{1.5cm}|p{6cm}|}
+                \hline
+                \textbf{ID} & \textbf{Name} & \textbf{Description} \\ \hline
+                023 & SafeOn-Alertpage-Detail &
+                Provides full information about a selected alert, including anomaly type, risk level, device IP/MAC, and the generated timestamp. The page also indicates the alert state (e.g., acknowledged) and includes metadata derived from the ML pipeline such as anomaly confidence or category. This view helps users understand the context of the event and determine appropriate follow-up actions.
+                \\ \hline
+                \end{tabular}
+                \end{table}
+            \break
+
+            \item Alert Detail Page (Block)
+                \begin{figure}[h]
+                    \centering
+                    \includegraphics[width=0.2\textwidth]{images/app/alert_detail_block.png}
+                    \caption{Alert Detail Page Block}
+                    \label{fig:Alert Detail Page Block}
+                \end{figure}
+
+                \begin{table}[h]
+                \centering
+                \begin{tabular}{|p{0.4cm}|p{1.5cm}|p{6cm}|}
+                \hline
+                \textbf{ID} & \textbf{Name} & \textbf{Description} \\ \hline
+                023 & SafeOn-Alertpage-Detail-Block &
+                Enables the user to immediately block the device associated with the alert. When activated, a block command is sent to the gateway, isolating the device from the network to prevent further suspicious activity.
+
+                \\ \hline
+                \end{tabular}
+                \end{table}
+            \break
+
+            \subsubsection{6) My Page Screens}
+            \vspace{0.5em}
+
+            \begin{enumerate}
+                \item Profile Overview Page
+                    \begin{figure}[h]
+                        \centering
+                        \includegraphics[width=0.2\textwidth]{images/app/profile_overview.png}
+                        \caption{Profile Overview Page}
+                        \label{fig:Profile Overview Page}
+                    \end{figure}
+
+                    \begin{table}[h]
+                    \centering
+                    \begin{tabular}{|p{0.4cm}|p{1.5cm}|p{6cm}|}
+                    \hline
+                    \textbf{ID} & \textbf{Name} & \textbf{Description} \\ \hline
+                    024 & SafeOn-Mypage &
+                    Displays the user’s basic account information including email address and nickname. The page also provides security-related settings such as Home Mode activation, daily auto-activation, and push notification preferences. A logout button is available for ending the session.
+                    \\ \hline
+                    \end{tabular}
+                    \end{table}
+                \break
+                
+                \item Profile Edit Page
+                    \begin{figure}[h]
+                        \centering
+                        \includegraphics[width=0.2\textwidth]{images/app/profile_edit.png}
+                        \caption{Profile Edit Page}
+                        \label{fig:Profile Edit Page}
+                    \end{figure}
+
+                    \begin{table}[h]
+                    \centering
+                    \begin{tabular}{|p{0.4cm}|p{1.5cm}|p{6cm}|}
+                    \hline
+                    \textbf{ID} & \textbf{Name} & \textbf{Description} \\ \hline
+                    025 & SafeOn-Mypage-Edit &
+                    Allows the user to update personal information. The email field is shown as read-only, while the user may optionally set a new password and update their nickname. Changes are submitted to the backend, and upon success, the updated profile is reflected throughout the app.
+                    \\ \hline
+                    \end{tabular}
+                    \end{table}
+
+                \item Logout
+                    \begin{figure}[h]
+                        \centering
+                        \includegraphics[width=0.2\textwidth]{images/app/logout.png}
+                        \caption{Logout}
+                        \label{fig:Logout}
+                    \end{figure}
+
+                    \begin{table}[h]
+                    \centering
+                    \begin{tabular}{|p{0.4cm}|p{1.5cm}|p{6cm}|}
+                    \hline
+                    \textbf{ID} & \textbf{Name} & \textbf{Description} \\ \hline
+                    025 & SafeOn-Mypage-Logout &
+                    Allows the user to securely terminate their session and return to the login screen. Upon logout, all locally cached user information is cleared, ensuring privacy and preventing unauthorized access.
+
+                    \\ \hline
+                    \end{tabular}
+                    \end{table}
+                
+            \end{enumerate}
+                
+            
+
+    
+            
+            
+        \end{enumerate}
+                
+    
+\end{enumerate}
+    
+
+    \section{System Architecture}
+    
+    \subsection{System Overview}
+    \vspace{0.3em}
+
+    \begin{figure}[h]
+        \centering
+        \includegraphics[width=0.5\textwidth]{images/architecture.png}
+        \caption{System Architecture}
+        \label{fig:System Architecture}
+    \end{figure}
+    
+    SafeOn adopts a four-layer edge-first architecture designed to secure heterogeneous smart-home IoT environments. All IoT devices connect through \textbf{an OpenWrt-based gateway layer}, which captures network traffic and generates flow-level telemetry. \textbf{The backend layer} processes these flows, stores time-series data, and coordinates communication with the machine learning server. \textbf{The ML layer} performs anomaly detection using Isolation Forest and Random Forest models, while \textbf{the frontend layer} dashboard provides real-time alerts, device monitoring, and blocking controls. This layered architecture enables privacy-preserving, low-latency detection and response without modifying IoT device firmware or relying on external cloud services.
+    \vspace{0.5em}
+    
+
+    \subsection{System Components}
+
+    \vspace{0.3em}
+
+    The SafeOn architecture is composed of four cooperating layers that together realize continuous monitoring, anomaly detection, threat response, and user interaction.
+    
+    \subsubsection{1) Packet Collection Layer (OpenWrt Router)}
+    
+    This layer is deployed on a Raspberry Pi running OpenWrt, functioning as a dedicated IoT security gateway. All IoT devices associate to this access point, allowing SafeOn to observe every inbound and outbound packet in the IoT subnet.
+    
+    Three core services operate on the edge node:
+    
+    \begin{itemize}
+        \item \textbf{Device Detection Service}: Monitors DHCP and wireless events
+        to automatically detect newly connected devices and publishes structured
+        discovery messages to the backend via MQTT. These devices initially appear as
+        ``unclaimed’’ until a user registers ownership through the dashboard.
+    
+        \item \textbf{Flow Generation Service}: Captures raw packets using tcpdump
+        and aggregates them into 3-second flow windows. Each window is transformed into
+        a statistical feature vector covering packet counts, byte volume, interval
+        variance, and directional ratios before being transmitted to the backend.
+    
+        \item \textbf{Command Listener Service}: Listens for block commands issued
+        by the backend and enforces isolation through firewall rules, immediately
+        restricting communication for compromised devices.
+    \end{itemize}
+    
+    This design ensures strict privacy because only statistical flow summaries
+    are transmitted; no packet payloads ever leave the home.
+    
+    \subsubsection{2) Backend Processing Layer (Spring Boot)}
+    
+    The backend serves as the central processing hub that binds the router,
+    machine learning server, and dashboard. Its responsibilities include:
+    
+    \begin{itemize}
+        \item Subscription to router-origin MQTT topics for receiving device discovery
+        messages and flow telemetry.
+        \item Feature normalization and time-series storage using PostgreSQL + TimescaleDB.
+        \item Forwarding validated flow vectors to the ML server for inference.
+        \item Applying SafeOn's hybrid detection policy, which considers both ML scores
+        and contextual rules such as the presence of external IP addresses.
+        \item Issuing device-block commands when the user requests containment.
+        \item Managing user-device associations and distributing real-time security alerts.
+        \item Serving REST APIs for authentication, device management, alert retrieval,
+        and dashboard data queries.
+    \end{itemize}
+    
+    Additionally, the backend exposes a WebSocket endpoint that streams real-time device traffic statistics to the dashboard, enabling continuous visualization.
+    
+    \subsubsection{3) Machine Learning Layer (FastAPI)}
+    
+    This layer hosts the anomaly detection models:
+    
+    \begin{itemize}
+        \item \textbf{Isolation Forest} — computes unsupervised anomaly scores
+        based on multivariate statistical flow features;
+        \item \textbf{Random Forest} — performs supervised classification to
+        distinguish malicious from benign flows.
+    \end{itemize}
+    
+    The ML server returns inference results with minimal latency through MQTT, supporting near real-time detection. Because the models rely solely on flow-level features, they generalize effectively across heterogeneous IoT devices.
+    
+    \subsubsection{4) Frontend Dashboard Layer (Flutter App)}
+    
+    The dashboard provides users with:
+    
+    \begin{itemize}
+        \item Real-time device traffic visualization via a secure WebSocket stream;
+        \item Automatic display of alerts, including reasons, severity, and packet metadata;
+        \item Device-claiming and device-blocking workflows;
+        \item Historical trend graphs and anomaly logs retrieved from the backend.
+    \end{itemize}
+    
+    Through this interface, users maintain situational awareness and can take immediate action in response to anomalies.
+
+    
+    \subsection{Data Flow and Detection Pipeline}
+
+    \vspace{0.3em}
+    
+    The overall SafeOn pipeline consists of four continuous stages:
+    
+    \subsubsection{1) Traffic Capture and Flow Extraction}
+    IoT packets are captured by the OpenWrt gateway using tcpdump. Packets are grouped into flow windows, and features such as packet counts, byte statistics, interval variance, and inbound/outbound ratios are computed.
+    
+    \subsubsection{2) Edge Publishing and Backend Ingestion}
+    Summarized flow vectors are published to the backend through MQTT topics. The backend validates the data, normalizes feature values, stores them in TimescaleDB, and forwards them to the ML server.
+    
+    \subsubsection{3) Machine Learning Inference and Threat Scoring}
+    The ML server computes:
+    \begin{itemize}
+        \item Anomaly score via Isolation Forest
+        \item Classification label via Random Forest
+    \end{itemize}
+    
+    If both suggest suspicious behavior—or if the anomaly score exceeds a predefined threshold—the backend generates a security alert.
+    
+    \subsubsection{4) Response, Alerting, and Device Blocking}
+    When an anomaly is confirmed:
+    
+    \begin{itemize}
+       \item The backend issues a real-time alert through the SSE
+        \item A structured alert is delivered to the Flutter dashboard.
+        \item The user may optionally request immediate device blocking from the UI.
+        \item The backend then transmits a block command to the OpenWrt gateway, which enforces isolation via firewall rules.
+    \end{itemize}
+    
+    All alerts and actions are logged for later forensic analysis, and periodic feedback can be incorporated into future model updates.
+    \vspace{1em}
+
+
+    \subsection{Directory Organization}
+    
+    \newpage
+
+        \begin{table}[t]
+            \caption{Directory Organization--Frontend (SAFEON-FE, Part 1)}
+            \centering
+            \renewcommand{\arraystretch}{1.4}
+            \begin{tabular}{|p{2.0cm}|p{3cm}|p{3cm}|}
+            \hline
+            \textit{\textbf{Directory}} & \textit{\textbf{File / Folder Name}} & \textit{\textbf{Modules used}} \\
+            \hline
+            SAFEON-FE &
+            analysis\_options.yaml\newline
+            pubspec.yaml\newline
+            pubspec.lock\newline
+            README.md\newline
+            safeonapp.iml\newline
+            android/\newline
+            ios/\newline
+            lib/\newline
+            assets/\newline
+            linux/\newline
+            macos/\newline
+            web/\newline
+            windows/ &
+            flutter\newline
+            cupertino\_icons\newline
+            http\newline
+            intl\newline
+            flutter\_local\_notifications\newline
+            fl\_chart\newline
+            characters \\
+            \hline
+            
+            SAFEON-FE\newline /lib &
+            main.dart\newline
+            models/\newline
+            screens/\newline
+            services/\newline
+            theme/\newline
+            widgets/ &
+            flutter\newline
+            material.dart\newline
+            http\newline
+            intl\newline
+            flutter\_local\_notifications\newline
+            fl\_chart\newline
+            characters \\
+            \hline
+            
+            SAFEON-FE\newline /lib/models &
+            alert.dart\newline
+            daily\_anomaly\_count.dart\newline
+            dashboard\_overview.dart\newline
+            device\_traffic\_point.dart\newline
+            device.dart\newline
+            user\_profile.dart\newline
+            user\_session.dart &
+            dart:core\newline
+            dart:convert\newline
+            collection \\
+            \hline
+            
+            SAFEON-FE\newline /lib/screens &
+            alert\_detail\_screen.dart\newline
+            dashboard\_screen.dart\newline
+            device\_detail\_screen.dart\newline
+            login\_screen.dart\newline
+            onboarding\_screen.dart\newline
+            profile\_edit\_screen.dart &
+            flutter\newline
+            material.dart\newline
+            intl\newline
+            fl\_chart\newline
+            app\_theme.dart\newline
+            safeon\_api.dart \\
+            \hline
+            
+            SAFEON-FE\newline /lib/services &
+            notification\_service.dart\newline
+            safeon\_api.dart &
+            http\newline
+            flutter\_local\_notifications\newline
+            dart:async\newline
+            dart:convert \\
+            \hline
+            
+            SAFEON-FE\newline /lib/widgets &
+            alert\_tile.dart\newline
+            device\_card.dart\newline
+            section\_header.dart\newline
+            security\_graph\_card.dart\newline
+            stat\_card.dart\newline
+            status\_chip.dart &
+            flutter\newline
+            material.dart\newline
+            fl\_chart\newline
+            intl\newline
+            app\_theme.dart \\
+            \hline
+            
+            SAFEON-FE\newline /lib/theme &
+            app\_theme.dart &
+            flutter\newline
+            material.dart \\
+            \hline
+            \end{tabular}
+            \end{table}
+        
+        \break
+
+        \begin{table}[t]
+            \caption{Directory Organization--Frontend (SAFEON-FE, Part 2)}
+            \centering
+            \renewcommand{\arraystretch}{1.4}
+            \begin{tabular}{|p{2.0cm}|p{3cm}|p{3cm}|}
+            \hline
+            \textit{\textbf{Directory}} & \textit{\textbf{File / Folder Name}} & \textit{\textbf{Modules used}} \\
+            \hline
+            
+            SAFEON-FE\newline /assets &
+            logo.svg\newline
+            workflow.png &
+            Flutter asset system \\
+            \hline
+            
+            SAFEON-FE\newline /android &
+            (Android native project files) &
+            Flutter engine\newline
+            AndroidX\newline
+            Gradle \\
+            \hline
+            
+            SAFEON-FE\newline /ios &
+            Podfile\newline
+            Runner/\newline
+            Flutter/ &
+            Flutter engine\newline
+            CocoaPods\newline
+            UIKit\newline
+            Foundation \\
+            \hline
+            
+            SAFEON-FE\newline /linux &
+            (Linux runner files) &
+            Flutter Linux embedding\newline
+            GTK\newline
+            CMake \\
+            \hline
+            
+            SAFEON-FE\newline /macos &
+            (Mac runner files) &
+            Flutter macOS embedding\newline
+            AppKit\newline
+            CocoaPods \\
+            \hline
+            
+            SAFEON-FE\newline /windows &
+            (Windows runner files) &
+            Flutter Windows embedding\newline
+            Win32 API\newline
+            CMake \\
+            \hline
+            
+            SAFEON-FE\newline /web &
+            favicon.png\newline
+            icons/\newline
+            index.html\newline
+            manifest.json &
+            Flutter web runtime\newline
+            HTML\newline
+            PWA manifest \\
+            \hline
+        
+            \end{tabular}
+        \end{table}
+
+        \begin{table}[t]
+            \centering
+            \renewcommand{\arraystretch}{1.4}
+            \caption{Directory Organization--Backend (SAFEON-BE, Part 1)}
+            \label{tab:dir-safeon-backend-a}
+            \begin{tabular}{|p{2cm}|p{3cm}|p{3cm}|}
+                \hline
+                \textit{\textbf{Directory}} & \textit{\textbf{File / Folder Name}} & \textit{\textbf{Modules used}} \\
+                \hline
+        
+                SAFEON-BE &
+                build.gradle\newline
+                settings.gradle\newline
+                gradle.properties\newline
+                gradlew\newline
+                gradlew.bat\newline
+                gradle/wrapper/gradle-wrapper.jar\newline
+                gradle/wrapper/gradle-wrapper.properties\newline
+                src/\newline
+                bin/\newline
+                safeon.session.sql\newline
+                safeon-backend-ml-tcp1921681231621883\newline
+                safeon-backend-router-tcp1921681231621883\newline
+                README.md &
+                spring-boot-starter-web\newline
+                spring-boot-starter-data-jpa\newline
+                spring-boot-starter-security\newline
+                spring-boot-starter-validation\newline
+                spring-boot-starter-websocket\newline
+                springdoc-openapi-starter-webmvc-ui\newline
+                org.eclipse.paho.client\newline
+                .mqttv3\newline
+                jjwt-api\newline
+                jjwt-impl\newline
+                jjwt-jackson\newline
+                lombok\newline
+                postgresql \\
+                \hline
+            \end{tabular}
+        \end{table}
+
+
+\begin{table}[t]
+    \centering
+    \renewcommand{\arraystretch}{1.4}
+    \caption{Directory Organization--Backend (SAFEON-BE, Part 2)}
+    \label{tab:dir-safeon-backend-b}
+
+    \begin{tabularx}{\linewidth}{|
+        >{\raggedright\arraybackslash}p{2cm} |
+        >{\raggedright\arraybackslash}X |
+        >{\raggedright\arraybackslash}X |
+    }
+        \hline
+        \textit{\textbf{Directory}} & \textit{\textbf{File / Folder Name}} & \textit{\textbf{Modules used}} \\
+        \hline
+
+        SAFEON-BE\newline /src/main/java/config &
+        MlMqttProperties.java\newline
+        RouterMqttProperties.java\newline
+        SecurityConfig.java\newline
+        SwaggerConfig.java\newline
+        TaskSchedulerConfig.java\newline
+        WebSocketConfig.java &
+        spring-boot-starter-web\newline
+        spring-boot-starter-security\newline
+        spring-boot-starter-websocket\newline
+        spring-boot-starter-validation\newline
+        springdoc-openapi-starter-webmvc-ui\newline
+        org.eclipse.paho.client.mqttv3 \\
+        \hline
+
+        SAFEON-BE\newline /src/main/java/controller &
+        AlertController.java\newline
+        AuthController.java\newline
+        DashboardController.java\newline
+        DeviceController.java\newline
+        MyPageController.java &
+        spring-boot-starter-web\newline
+        spring-boot-starter-security\newline
+        spring-boot-starter-validation \\
+        \hline
+
+        SAFEON-BE\newline /src/main/java/domain &
+        Alert.java\newline
+        AnomalyScore.java\newline
+        Device.java\newline
+        PacketMeta.java\newline
+        TwinResidual.java\newline
+        User.java\newline
+        UserAlert.java\newline
+        UserDevice.java &
+        spring-boot-starter-data-jpa\newline
+        jakarta.persistence-api\newline
+        lombok \\
+        \hline
+
+        SAFEON-BE\newline /src/main/java/dto &
+        ApiResponseDto.java\newline
+        SimpleMessageResponseDto.java\newline
+        alert/AlertCreateRequestDto.java\newline
+        alert/AlertResponseDto.java\newline
+        dashboard/DailyAnomalyCountDto.java\newline
+        dashboard/DailyAnomalyCountResponseDto.java\newline
+        dashboard/DashboardDeviceDto.java\newline
+        dashboard/DashboardDeviceListResponseDto.java\newline
+        dashboard/DashboardOverviewDto.java\newline
+        dashboard/RecentAlertListResponseDto.java\newline
+        device/DeviceBlockRequestDto.java\newline
+        device/DeviceDiscoveryRequestDto.java\newline
+        device/DeviceResponseDto.java\newline
+        device/DeviceTrafficPointDto.java\newline
+        user/JwtResponseDto.java\newline
+        user/LoginRequestDto.java\newline
+        user/SignUpRequestDto.java\newline
+        user/UserResponseDto.java\newline
+        user/UserUpdateRequestDto.java &
+        spring-boot-starter-web\newline
+        spring-boot-starter-validation\newline
+        lombok \\
+        \hline
+
+        SAFEON-BE\newline /src/main/java/mqtt &
+        MlMqttClientService.java\newline
+        MlRequestPublisher.java\newline
+        MlResultMqttListener.java\newline
+        MqttPacketListener.java\newline
+        RouterMqttClientService.java\newline
+        RouterMqttPacketListener.java &
+        org.eclipse.paho.client.mqttv3\newline
+        spring-boot-starter\newline
+        spring-boot-starter-web\newline
+        spring-boot-starter-websocket \\
+        \hline
+
+        SAFEON-BE\newline /src/main/java/repository &
+        AlertRepository.java\newline
+        AnomalyScoreRepository.java\newline
+        DeviceRepository.java\newline
+        PacketMetaRepository.java\newline
+        UserAlertRepository.java\newline
+        UserDeviceRepository.java\newline
+        UserRepository.java &
+        spring-boot-starter-data-jpa\newline
+        postgresql \\
+        \hline
+
+        SAFEON-BE\newline /src/main/java/security &
+        AuthContext.java\newline
+        AuthenticatedUser.java\newline
+        JwtAuthenticationFilter.java\newline
+        JwtTokenProvider.java &
+        spring-boot-starter-security\newline
+        jjwt-api\newline
+        jjwt-impl\newline
+        jjwt-jackson \\
+        \hline
+
+    \end{tabularx}
+\end{table}
+
+
+
+        \begin{table}[t]
+    \centering
+    \renewcommand{\arraystretch}{1.4}
+    \caption{Directory Organization--Backend (SAFEON-BE, Part 1)}
+    \label{tab:dir-safeon-backend-a}
+
+    \begin{tabularx}{\linewidth}{|
+        >{\raggedright\arraybackslash}p{2cm} |
+        >{\raggedright\arraybackslash}X |
+        >{\raggedright\arraybackslash}X |
+    }
+        \hline
+        \textit{\textbf{Directory}} &
+        \textit{\textbf{File / Folder Name}} &
+        \textit{\textbf{Modules used}} \\
+        \hline
+
+        SAFEON-BE\newline /src/main/java/service &
+        AlertService.java\newline
+        AuthService.java\newline
+        DashboardService.java\newline
+        DeviceService.java\newline
+        DeviceTrafficService.java\newline
+        MyPageService.java &
+        spring-boot-starter-web\newline
+        spring-boot-starter-data-jpa\newline
+        spring-boot-starter-security\newline
+        spring-boot-starter-validation\newline
+        org.eclipse.paho.client.mqttv3 \\
+        \hline
+
+        SAFEON-BE\newline /src/main/java/util &
+        UuidParser.java &
+        java.util\newline
+        java.util.UUID \\
+        \hline
+
+        SAFEON-BE\newline /src/main/java/websocket &
+        DeviceTrafficWebSocketHandler.java\newline
+        JwtHandshakeInterceptor.java &
+        spring-boot-starter-websocket\newline
+        spring-boot-starter-security \\
+        \hline
+
+        SAFEON-BE\newline /src/main/resources &
+        application.yml &
+        spring-boot-autoconfigure\newline
+        spring-boot-starter \\
+        \hline
+
+        SAFEON-BE\newline /src/test/java &
+        DemoApplicationTests.java &
+        spring-boot-starter-test \\
+        \hline
+
+    \end{tabularx}
+\end{table}
+
+
+
+
+\begin{table}[t]
+    \centering
+    \small
+    \renewcommand{\arraystretch}{1.4}
+    \caption{Directory Organization--ML Service}
+    \label{tab:dir-safeon-ml}
+
+    % X 컬럼에서 줄바꿈 허용하도록 설정
+    \begin{tabularx}{\linewidth}{|
+        >{\raggedright\arraybackslash}p{2.2cm} |
+        >{\raggedright\arraybackslash}X |
+        >{\raggedright\arraybackslash}X |
+    }
+        \hline
+        \textit{\textbf{Directory}} & \textit{\textbf{File / Folder Name}} & \textit{\textbf{Modules used}} \\
+        \hline
+
+        SAFEON-ML &
+        requirements.txt\newline
+        README.md &
+        fastapi\newline
+        uvicorn\newline
+        pydantic\newline
+        numpy\newline
+        pandas\newline
+        scikit-learn\newline
+        torch\newline
+        joblib\newline
+        paho-mqtt \\
+        \hline
+
+        SAFEON-ML\newline /app &
+        \_\_init\_\_.py\newline
+        main.py\newline
+        model.py\newline
+        mqtt\_bridge.py\newline
+        train.py &
+        fastapi\newline
+        pydantic\newline
+        numpy\newline
+        pandas\newline
+        torch\newline
+        joblib\newline
+        scikit-learn\newline
+        paho-mqtt\newline
+        dotenv\newline
+        uvicorn \\
+        \hline
+
+        SAFEON-ML\newline /models &
+        autoencoder.pth\newline
+        transformer\_ae.pth\newline
+        isolation\_forest.pkl\newline
+        rf\_model.pkl\newline
+        clf\_model.pkl\newline
+        scaler.pkl\newline
+        enc\_src\_ip.pkl\newline
+        enc\_dst\_ip.pkl\newline
+        enc\_proto.pkl\newline
+        meta.json &
+        torch\newline
+        scikit-learn\newline
+        joblib\newline
+        json \\
+        \hline
+
+        SAFEON-ML\newline /app/main.py &
+        FastAPI entrypoint routing and /predict endpoint &
+        fastapi\newline
+        pydantic\newline
+        uvicorn \\
+        \hline
+
+        SAFEON-ML\newline /app/model.py &
+        ModelService for inference and anomaly scoring &
+        numpy\newline
+        pandas\newline
+        torch\newline
+        joblib\newline
+        scikit-learn\newline
+        logging \\
+        \hline
+
+        SAFEON-ML\newline /app/mqtt\_bridge.py &
+        MQTT ingestion and publish &
+        paho-mqtt\newline
+        json\newline
+        dotenv\newline
+        logging \\
+        \hline
+
+        SAFEON-ML\newline /app/train.py &
+        Training script for anomaly detection models &
+        numpy\newline
+        pandas\newline
+        torch\newline
+        scikit-learn\newline
+        joblib \\
+        \hline
+
+    \end{tabularx}
+\end{table}
+
+        
+    \clearpage
+    
+    \section{UseCase}
+    \vspace{1em}
+
+        \subsection{Entry}
+        \begin{figure}[h]
+            \centering
+            \includegraphics[width=0.2\textwidth]{images/app/entry.png}
+            \caption{Entry}
+            \label{fig:Entry}
+        \end{figure}
+
+        The Entry page briefly introduces SafeOn and provides a starting point for users before authentication. By pressing the “Start” button, users proceed to either sign up for a new account or log in with an existing one.
+        
+        \break
+        
+        \subsection{Sign Up}
+        \begin{figure}[h]
+            \centering
+            \includegraphics[width=0.2\textwidth]{images/app/signup.png}
+            \caption{Signup page}
+            \label{fig:Signup page}
+        \end{figure}
+        
+        Users can create an account by entering their email address, password, nickname, and agreeing to the privacy policy. After completing the form, they are redirected to the login screen where they can access SafeOn services.
+        
+        \vspace{1em}
+        
+        \subsection{Login}
+        \begin{figure}[h]
+            \centering
+            \includegraphics[width=0.2\textwidth]{images/app/login.png}
+            \caption{Login page}
+            \label{fig:Login page}
+        \end{figure}
+        
+        The Login page allows users to sign in by verifying their email and password. Once authenticated, users gain access to the main dashboard and system features.
+        
+        \vspace{1em}
+        
+        \subsection{Main Page}
+        \begin{figure}[h]
+            \centering
+            \includegraphics[width=0.2\textwidth]{images/app/mainpage_dashboard.png}
+            \caption{Main DashBoard}
+            \label{fig:Main DashBoard}
+        \end{figure}
+        
+        The Main Page summarizes the system’s security status, including total device count, network health, cumulative alerts, and recent alert activity. These indicators help users quickly understand the overall condition of their smart-home environment.
+        
+        \vspace{1em}
+        
+        \subsection{IoT Device Discovery \& Claiming}
+        \begin{figure}[h]
+            \centering
+            \includegraphics[width=0.2\textwidth]{images/app/device_new_find.png}
+            \caption{New device discovery popup}
+            \label{fig:New device discovery popup}
+        \end{figure}
+        
+        When a new device joins the network, SafeOn automatically displays a discovery popup containing its MAC and IP information. Users may register the device to claim ownership or block the device immediately to prevent access.
+        
+        \vspace{1em}
+        
+        \subsection{Real-Time Device Traffic Monitoring}
+        \begin{figure}[h]
+            \centering
+            \includegraphics[width=0.2\textwidth]{images/app/device_detail_flow.png}
+            \caption{Device detail page with traffic graphs}
+            \label{fig:Device detail page with traffic graphs}
+        \end{figure}
+        
+        Users can view detailed information for each registered device, including its IP address, MAC address, registration time, and serial number. Real-time PPS and BPS graphs show traffic behavior during the last 15 minutes, allowing users to detect abnormal patterns.
+        
+        \break
+        
+        \subsection{Alert Center}
+        \begin{figure}[h]
+            \centering
+            \includegraphics[width=0.2\textwidth]{images/app/alert_filled_list.png}
+            \caption{Alert list (filled)}
+            \label{fig:Alert list (filled)}
+        \end{figure}
+        
+        The Alert Center displays a chronological list of detected anomalies. Each alert card includes severity, timestamp, and device information. Unread alerts are visually marked until the user views them.
+
+
+        \subsection{Alert Detail}
+        \begin{figure}[h]
+            \centering
+            \includegraphics[width=0.2\textwidth]{images/app/alert_detail.png}
+            \caption{Alert detail page}
+            \label{fig:Alert detail page}
+        \end{figure}
+        
+        Selecting an alert opens a detailed view containing risk level, MAC address, device name, alert status, and detection time.
+        
+        \vspace{1em}
+
+
+        \subsection{Device Blocking}
+        \begin{figure}[h]
+            \centering
+            \includegraphics[width=0.2\textwidth]{images/app/alert_detail_block.png}
+            \caption{Device blocking workflow}
+            \label{fig:Device blocking workflow}
+        \end{figure}
+        
+        Users may block a suspicious device directly from the alert detail page. Once confirmed, SafeOn updates firewall rules on the OpenWrt gateway, immediately preventing the device from accessing the network.
+        
+        \vspace{1em}
+        
+        \subsection{My Page}
+        \begin{figure}[h]
+            \centering
+            \includegraphics[width=0.2\textwidth]{images/app/profile_overview.png}
+            \caption{My Page}
+            \label{fig:My Page}
+        \end{figure}
+        
+        The My Page screen displays the user's profile information and provides access to security settings. Users can modify their nickname, update their password, and adjust system preferences.
+        
+        
+        \vspace{1em}
+        
+        \subsection{Logout}
+        \begin{figure}[h]
+            \centering
+            \includegraphics[width=0.2\textwidth]{images/app/logout.png}
+            \caption{Logout}
+            \label{fig:Logout}
+        \end{figure}
+        Users can safely terminate their session by selecting “Logout” from My Page. After logging out, the application returns to the Entry page.
+
+
+
+        \section{Evaluation}
+The evaluation of SafeOn focuses on validating the feasibility of an edge-first EDR architecture within smart-home IoT environments. Since the primary goal of this work was to design a complete end-to-end pipeline---from packet acquisition to anomaly detection and user-facing alert delivery---the assessment emphasizes functional correctness and qualitative performance rather than large-scale quantitative benchmarking.
+
+First, the data collection pipeline using ESP32-CAM devices successfully produced approximately 1,000 flow samples representing typical smart-home behaviors such as video streaming, motion-triggered bursts, HTTP/API communication, and bidirectional control traffic. These data were processed through the feature engineering module, demonstrating stable extraction of features including packet intervals, burst indicators, and inbound/outbound ratios.
+
+Second, the analytical pipeline integrating Isolation Forest, LSTM Autoencoder, and Digital Twin residual scoring was tested in a controlled environment. Each model generated anomaly predictions that were consistently routed through the backend and displayed on the dashboard in near real time. The overall inference latency remained within a practical range for a Raspberry Pi-class device, confirming the viability of local, on-edge inference.
+
+Finally, the front-end dashboard verified that SafeOn can effectively visualize traffic patterns, deliver anomaly alerts, and support device-level management. Overall, the results demonstrate the technical feasibility and usability of the proposed system, though broader quantitative evaluation remains part of future work.
+
+\section{Limitations and Future Work}
+Despite completing a fully operational prototype, SafeOn has several limitations that inform future research directions.
+
+First, the dataset size is relatively small (approximately 1,000 samples) and lacks diversity in device types, behavioral contexts, and attack scenarios. This restricts the generalizability of the anomaly detection models, particularly the LSTM Autoencoder and Digital Twin residual predictor. Future work will expand the dataset to include a wider range of IoT devices and simulated attack vectors.
+
+Second, the ESP32-CAM traffic used for modeling exhibits irregular frame rates and bursty patterns, which reduces the expressiveness of the current feature set. Incorporating additional traffic sources such as smart speakers, environmental sensors, and home appliances may provide richer behavioral signatures.
+
+Third, real-time local inference introduces latency constraints on the Raspberry Pi. While current performance is acceptable, scaling the system to accommodate multiple devices or continuous video workloads may require model optimization, quantization, or leveraging lightweight edge accelerators.
+
+In addition, the system largely relies on IP- and flow-level metadata, which is effective for lightweight anomaly detection but insufficient for fine-grained behavioral understanding. As a major extension, we propose integrating a \textbf{Digital Twin} framework capable of simulating expected device states and network behavior. A more advanced Digital Twin would enable predictive validation, richer context-aware anomaly scoring, and proactive defense mechanisms by comparing real-time telemetry with simulated ideal trajectories.
+
+Finally, future work will also explore encrypted traffic fingerprinting, federated learning for privacy-preserving model updates, and improved alert interpretation to support a broader deployment of SafeOn in heterogeneous smart-home environments.
+
+\section{Discussion}
+
+\subsection{Technical Difficulties}
+The development of SafeOn posed several technical challenges. The ESP32-CAM produced highly inconsistent traffic patterns, including fluctuating frame intervals and motion-triggered bursts, making feature extraction non-trivial. Constructing a unified pipeline---comprising PCAP capture, feature engineering, ML inference, MQTT messaging, and backend aggregation---required careful synchronization to avoid packet loss and timestamp misalignment.
+
+Real-time inference on constrained hardware also introduced performance difficulties, as the Raspberry Pi needed to handle both continuous packet ingestion and anomaly scoring concurrently. Additionally, the MQTT-based communication between the ML service and backend required strict topic structuring and retry logic to ensure message integrity. Visualizing anomaly scores in a way that users could interpret meaningfully further required iterative UI refinement.
+
+\subsection{Non-Technical Difficulties}
+The project required continuous coordination among team members working on backend, AI, and frontend components. Aligning design decisions, resolving merge conflicts, and maintaining consistent API contracts occasionally caused delays. Time constraints, especially when balancing academic schedules, also made it challenging to refine experimental features or explore alternative modeling approaches.
+
+\subsection{Conclusion}
+Despite these challenges, SafeOn successfully demonstrates the feasibility of an edge-first anomaly detection framework for smart-home IoT systems. The project highlighted the importance of modular system design, efficient communication between components, and lightweight inference on constrained hardware. The experience gained---both technically and collaboratively---establishes a strong foundation for future enhancements, including more diverse datasets, optimized models, and an expanded Digital Twin-based predictive monitoring architecture.
+
+
+
+    \end{enumerate}
+
+\begin{thebibliography}{99}
+
+\bibitem{openwrt}
+“OpenWrt Documentation,” https://openwrt.org/docs/start, 2024.
+
+\bibitem{esp32cam}
+“ESP32-CAM AI-Thinker Module,” Espressif Systems, https://www.espressif.com/en/products/modules/esp32, 2024.
+
+\bibitem{mqtt}
+“OASIS MQTT Version 3.1.1 Standard,” https://docs.oasis-open.org/mqtt/mqtt/v3.1.1/, 2024.
+
+\bibitem{paho}
+“Eclipse Paho MQTT Client,” https://www.eclipse.org/paho/, 2024.
+
+\bibitem{fastapi}
+“FastAPI,” https://fastapi.tiangolo.com/, 2024.
+
+\bibitem{pytorch}
+“PyTorch,” https://pytorch.org/, 2024.
+
+\bibitem{sklearn}
+“scikit-learn Machine Learning Library,” https://scikit-learn.org/stable/, 2024.
+
+\bibitem{isoforest}
+F.~T. Liu, K.~M. Ting, and Z.-H. Zhou, “Isolation Forest,” 
+in \textit{IEEE International Conference on Data Mining}, 2008.
+
+\bibitem{postgresql}
+“PostgreSQL Documentation,” https://www.postgresql.org/docs/, 2024.
+
+\bibitem{springboot}
+“Spring Boot Reference Documentation,” https://spring.io/projects/spring-boot, 2024.
+
+\bibitem{flutter}
+“Flutter Framework,” https://flutter.dev/, 2024.
+
+\end{thebibliography}
+
+       
+
+
 %     % Software workflow, modules
 %     % 파이써으로 몇게 파일을 만들어서 main.py 에  module로 추가할 예정
 %     % IsolationForest, LSTM Autoencoder AI 모텔을 만들 예정

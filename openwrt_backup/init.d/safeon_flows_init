@@ -1,0 +1,43 @@
+#!/bin/sh /etc/rc.common
+
+START=98
+STOP=10
+
+SERVICE_NAME="safeon_flows_init"
+PROG="/root/safeon_flows.py"
+PIDFILE="/var/run/$SERVICE_NAME.pid"
+
+start() {
+    echo "Starting $SERVICE_NAME..."
+    [ -x "$PROG" ] || {
+        echo "$PROG not executable"
+        exit 1
+    }
+    python3 "$PROG" >/tmp/flow_window_mqtt.log 2>&1 &
+    echo $! > "$PIDFILE"
+}
+
+stop() {
+    echo "Stopping $SERVICE_NAME..."
+    if [ -f "$PIDFILE" ]; then
+        kill "$(cat "$PIDFILE")" 2>/dev/null
+        rm -f "$PIDFILE"
+    fi
+}
+
+status() {
+    if [ -f "$PIDFILE" ]; then
+        PID=$(cat "$PIDFILE")
+        if kill -0 "$PID" 2>/dev/null; then
+            echo "$SERVICE_NAME is running (pid: $PID)"
+            return 0
+        else
+            echo "$SERVICE_NAME pidfile exists but process not running"
+            return 1
+        fi
+    else
+        echo "$SERVICE_NAME is not running"
+        return 3
+    fi
+}
+
