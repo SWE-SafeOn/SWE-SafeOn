@@ -9,9 +9,9 @@ import com.example.demo.domain.UserAlert;
 import com.example.demo.repository.AlertRepository;
 import com.example.demo.repository.AnomalyScoreRepository;
 import com.example.demo.repository.DeviceRepository;
+import com.example.demo.repository.PacketMetaRepository;
 import com.example.demo.repository.UserAlertRepository;
 import com.example.demo.repository.UserDeviceRepository;
-import com.example.demo.repository.PacketMetaRepository;
 import com.example.demo.service.DashboardService;
 import com.fasterxml.jackson.annotation.JsonAlias;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -160,6 +160,19 @@ public class RouterMqttPacketListener implements MqttPacketListener {
                         .build());
         score.setIsAnom(true);
         score = anomalyScoreRepository.save(score);
+
+        OffsetDateTime lastNormalTs = anomalyScoreRepository.findLastNormalTimestamp();
+        long consecutiveAnomalyCount = anomalyScoreRepository.countAnomaliesSince(lastNormalTs);
+        boolean alreadyNotified = lastNormalTs != null
+                ? alertRepository.existsByTsAfter(lastNormalTs)
+                : alertRepository.findLatestAlertTimestamp() != null;
+
+        if (consecutiveAnomalyCount < 3 || alreadyNotified) {
+            log.info("외부 접근 알림 생성을 건너뜁니다. consecutiveAnomalyCount={}, alreadyNotified={}",
+                    consecutiveAnomalyCount, alreadyNotified);
+            return;
+        }
+
         createExternalAccessAlert(meta, score, externalIp);
     }
 
