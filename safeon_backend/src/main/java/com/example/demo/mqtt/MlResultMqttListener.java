@@ -62,7 +62,7 @@ public class MlResultMqttListener implements MqttPacketListener {
             MlResultPayload result = objectMapper.readValue(message, MlResultPayload.class);
             processResult(result);
         } catch (Exception ex) {
-            log.warn("Failed to process ML result payload. topic={}, payload={}", topic, message, ex);
+            log.warn("ML 결과 페이로드 처리에 실패했습니다. topic={}, payload={}", topic, message, ex);
         }
     }
 
@@ -75,12 +75,12 @@ public class MlResultMqttListener implements MqttPacketListener {
      */
     private void processResult(MlResultPayload payload) {
         if (payload.packetMetaId() == null) {
-            log.warn("Skip ML result without packetMetaId: {}", payload);
+            log.warn("packetMetaId가 없어 ML 결과를 건너뜁니다: {}", payload);
             return;
         }
         PacketMeta packetMeta = packetMetaRepository.findById(payload.packetMetaId()).orElse(null);
         if (packetMeta == null) {
-            log.warn("Skip ML result with unknown packetMetaId={}", payload.packetMetaId());
+            log.warn("알 수 없는 packetMetaId={}로 ML 결과를 건너뜁니다", payload.packetMetaId());
             return;
         }
 
@@ -91,14 +91,14 @@ public class MlResultMqttListener implements MqttPacketListener {
         boolean isExternalAccess = StringUtils.hasText(externalIp);
         boolean isAnomaly = Boolean.TRUE.equals(payload.isAnom()) || isExternalAccess;
 
-        AnomalyScore score = AnomalyScore.builder()
-                .ts(eventTs)
-                .packetMeta(payload.packetMetaId())
-                .isoScore(payload.isoScore())
-                .rfScore(payload.rfScore())
-                .hybridScore(payload.hybridScore())
-                .isAnom(isAnomaly)
-                .build();
+        AnomalyScore score = anomalyScoreRepository.findByPacketMeta(payload.packetMetaId()).orElse(
+                AnomalyScore.builder().packetMeta(payload.packetMetaId()).build()
+        );
+        score.setTs(eventTs);
+        score.setIsoScore(payload.isoScore());
+        score.setRfScore(payload.rfScore());
+        score.setHybridScore(payload.hybridScore());
+        score.setIsAnom(isAnomaly);
         score = anomalyScoreRepository.save(score);
 
         if (!isAnomaly) {
@@ -112,7 +112,7 @@ public class MlResultMqttListener implements MqttPacketListener {
                 : alertRepository.findLatestAlertTimestamp() != null;
 
         if (consecutiveAnomalyCount < 3 || alreadyNotified) {
-            log.info("Skip alert creation. consecutiveAnomalyCount={}, alreadyNotified={}",
+            log.info("알림 생성을 건너뜁니다. consecutiveAnomalyCount={}, alreadyNotified={}",
                     consecutiveAnomalyCount, alreadyNotified);
             return;
         }
@@ -129,7 +129,7 @@ public class MlResultMqttListener implements MqttPacketListener {
                     packetMeta.getSrcIp(),
                     packetMeta.getDstIp()
             );
-            log.warn("External access detected from {}. packetMetaId={}, srcIp={}, dstIp={}",
+            log.warn("외부 접근이 감지되었습니다. externalIp={}, packetMetaId={}, srcIp={}, dstIp={}",
                     externalIp, packetMeta.getPacketMetaId(), packetMeta.getSrcIp(), packetMeta.getDstIp());
         }
 
@@ -168,7 +168,7 @@ public class MlResultMqttListener implements MqttPacketListener {
         }
         Optional<Device> device = deviceRepository.findById(deviceId);
         if (device.isEmpty()) {
-            log.warn("ML result includes unknown deviceId={}", deviceId);
+            log.warn("ML 결과에 알 수 없는 deviceId={}가 포함되어 있습니다", deviceId);
         }
         return device.orElse(null);
     }
@@ -196,7 +196,7 @@ public class MlResultMqttListener implements MqttPacketListener {
             }
         }
 
-        log.warn("Cannot resolve device for packetMetaId={} (srcIp={}, dstIp={})",
+        log.warn("packetMetaId={}에 대한 디바이스를 찾을 수 없습니다 (srcIp={}, dstIp={})",
                 packetMeta.getPacketMetaId(), packetMeta.getSrcIp(), packetMeta.getDstIp());
         return null;
     }
@@ -214,7 +214,7 @@ public class MlResultMqttListener implements MqttPacketListener {
         try {
             return LocalDateTime.parse(isoTime, DateTimeFormatter.ISO_LOCAL_DATE_TIME).atOffset(ZoneOffset.UTC);
         } catch (DateTimeParseException e) {
-            log.warn("Cannot parse ML result timestamp: {}", isoTime);
+            log.warn("ML 결과의 timestamp를 파싱할 수 없습니다: {}", isoTime);
             return null;
         }
     }
@@ -247,6 +247,25 @@ public class MlResultMqttListener implements MqttPacketListener {
     }
 
     private boolean isInternalIp(String ip) {
-        return ip.startsWith("192.168.");
+        String prefix = extractPrefix(ip);
+        if (prefix == null) {
+            return false;
+        }
+        return deviceRepository.findAll().stream()
+                .map(Device::getIp)
+                .filter(StringUtils::hasText)
+                .map(this::extractPrefix)
+                .anyMatch(prefix::equals);
+    }
+
+    private String extractPrefix(String ip) {
+        if (!StringUtils.hasText(ip)) {
+            return null;
+        }
+        String[] parts = ip.split("\\.");
+        if (parts.length < 2) {
+            return null;
+        }
+        return parts[0] + "." + parts[1];
     }
 }

@@ -59,7 +59,7 @@ public class DeviceTrafficWebSocketHandler extends TextWebSocketHandler {
         try {
             snapshot = deviceTrafficService.getRecentSnapshot(deviceId, user.userId());
         } catch (Exception ex) {
-            log.warn("Failed to prepare traffic snapshot. deviceId={}, userId={}", deviceId, user.userId(), ex);
+            log.warn("트래픽 스냅샷 준비에 실패했습니다. deviceId={}, userId={}", deviceId, user.userId(), ex);
             session.close(CloseStatus.POLICY_VIOLATION.withReason(ex.getMessage()));
             return;
         }
@@ -93,7 +93,7 @@ public class DeviceTrafficWebSocketHandler extends TextWebSocketHandler {
 
     @Override
     public void handleTransportError(WebSocketSession session, Throwable exception) throws Exception {
-        log.warn("WebSocket transport error. sessionId={}", session.getId(), exception);
+        log.warn("WebSocket 전송 오류가 발생했습니다. sessionId={}", session.getId(), exception);
         safeClose(session, CloseStatus.SERVER_ERROR.withReason("데이터 전송 오류가 발생했습니다."));
     }
 
@@ -128,7 +128,7 @@ public class DeviceTrafficWebSocketHandler extends TextWebSocketHandler {
                     state.deviceId()
             ));
         } catch (Exception ex) {
-            log.warn("Failed to push traffic updates. deviceId={}, sessionId={}", state.deviceId(), session.getId(), ex);
+            log.warn("트래픽 업데이트 전송에 실패했습니다. deviceId={}, sessionId={}", state.deviceId(), session.getId(), ex);
             safeClose(session, CloseStatus.SERVER_ERROR.withReason("트래픽 데이터 전송에 실패했습니다."));
         }
     }
@@ -159,7 +159,7 @@ public class DeviceTrafficWebSocketHandler extends TextWebSocketHandler {
         try {
             session.sendMessage(new TextMessage(objectMapper.writeValueAsString(payload)));
         } catch (Exception ex) {
-            log.warn("Failed to send traffic payload. sessionId={}", session.getId(), ex);
+            log.warn("트래픽 페이로드 전송에 실패했습니다. sessionId={}", session.getId(), ex);
             safeClose(session, CloseStatus.SERVER_ERROR.withReason("데이터 전송 실패"));
         }
     }

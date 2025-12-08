@@ -89,7 +89,7 @@ public class DeviceTrafficService {
                 return bucketed;
             }
         } catch (Exception ex) {
-            log.warn("Bucketed traffic query failed, falling back to raw. ip={}, since={}", ip, since, ex);
+            log.warn("버킷 단위 트래픽 조회에 실패했습니다. raw 데이터로 대체합니다. ip={}, since={}", ip, since, ex);
         }
 
         List<PacketMeta> raw = packetMetaRepository.findRecentByIp(ip, since, PAGE_LIMIT);

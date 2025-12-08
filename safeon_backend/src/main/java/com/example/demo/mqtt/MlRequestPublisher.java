@@ -34,7 +34,7 @@ public class MlRequestPublisher {
     public void publishPacketMetaJsonl(List<PacketMeta> rows) {
         String topic = resolveTopic();
         if (rows == null || rows.isEmpty()) {
-            log.info("No packet_meta rows to publish to MQTT. topic={}", topic);
+            log.info("MQTT로 전송할 packet_meta 행이 없습니다. topic={}", topic);
             return;
         }
 
@@ -47,7 +47,7 @@ public class MlRequestPublisher {
         }
 
         if (jsonlBuilder.length() == 0) {
-            log.warn("All packet_meta rows failed serialization. Nothing published.");
+            log.warn("모든 packet_meta 직렬화에 실패해 publish를 수행하지 않습니다.");
             return;
         }
 
@@ -57,7 +57,7 @@ public class MlRequestPublisher {
     private String resolveTopic() {
         String topic = mqttProperties.getMlRequestTopic();
         if (!StringUtils.hasText(topic)) {
-            throw new IllegalStateException("MQTT ml-request topic is not configured.");
+            throw new IllegalStateException("MQTT ml-request 토픽이 설정되지 않았습니다.");
         }
         return topic;
     }
@@ -81,7 +81,7 @@ public class MlRequestPublisher {
                     meta.getBps()
             ));
         } catch (JsonProcessingException e) {
-            log.warn("Failed to serialize packet_meta row, skipping. id={}", meta.getPacketMetaId(), e);
+            log.warn("packet_meta 직렬화에 실패했습니다. 건너뜁니다. id={}", meta.getPacketMetaId(), e);
             return null;
         }
     }

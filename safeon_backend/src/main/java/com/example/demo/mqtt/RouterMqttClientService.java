@@ -31,7 +31,7 @@ public class RouterMqttClientService {
     @PostConstruct
     public void start() {
         if (!properties.isReady()) {
-            log.info("Router MQTT not ready. brokerUri={}, topics={}, enabled={}",
+            log.info("라우터 MQTT 설정이 완료되지 않았습니다. brokerUri={}, topics={}, enabled={}",
                     properties.getBrokerUri(), properties.getTopics(), properties.isReady());
             return;
         }
@@ -46,7 +46,7 @@ public class RouterMqttClientService {
     private void connectAndSubscribe() {
         List<String> topics = properties.getTopics();
         if (topics.isEmpty()) {
-            log.warn("Router MQTT topics empty.");
+            log.warn("라우터 MQTT 구독 토픽이 비어 있습니다.");
             return;
         }
 
@@ -62,15 +62,15 @@ public class RouterMqttClientService {
                 try {
                     routerMqttPacketListener.onPacketReceived(topic, message.getPayload());
                 } catch (Exception ex) {
-                    log.warn("Router MQTT listener failed. topic={}", topic, ex);
+                    log.warn("라우터 MQTT 리스너 처리 실패. topic={}", topic, ex);
                 }
             };
             IMqttMessageListener[] listenersArray = topics.stream().map(t -> listener).toArray(IMqttMessageListener[]::new);
             client.subscribe(topicArray, qosArray, null, null, listenersArray);
 
-            log.info("Router MQTT connected. broker={}, topics={}", properties.getBrokerUri(), topics);
+            log.info("라우터 MQTT 연결 완료. broker={}, topics={}", properties.getBrokerUri(), topics);
         } catch (MqttException e) {
-            log.error("Router MQTT connect/subscribe failed. broker={}, topics={}", properties.getBrokerUri(), topics, e);
+            log.error("라우터 MQTT 연결/구독에 실패했습니다. broker={}, topics={}", properties.getBrokerUri(), topics, e);
         }
     }
 
@@ -97,18 +97,18 @@ public class RouterMqttClientService {
                 client.disconnect().waitForCompletion();
                 client.close();
             } catch (MqttException e) {
-                log.warn("Router MQTT disconnect failed", e);
+                log.warn("라우터 MQTT 종료에 실패했습니다.", e);
             }
         }
     }
 
     public void publish(String topic, String payload) {
         if (!properties.isReady()) {
-            log.warn("Router MQTT not ready. skip publish. topic={}", topic);
+            log.warn("라우터 MQTT가 준비되지 않아 publish를 건너뜁니다. topic={}", topic);
             return;
         }
         if (client == null || !connected.get()) {
-            log.warn("Router MQTT client not connected. skip publish. topic={}", topic);
+            log.warn("라우터 MQTT 클라이언트가 연결되지 않아 publish를 건너뜁니다. topic={}", topic);
             return;
         }
 
@@ -116,9 +116,9 @@ public class RouterMqttClientService {
             MqttMessage message = new MqttMessage(payload.getBytes(StandardCharsets.UTF_8));
             message.setQos(properties.getQos());
             client.publish(topic, message);
-            log.info("Router MQTT publish success. topic={}", topic);
+            log.info("라우터 MQTT publish 성공. topic={}", topic);
         } catch (MqttException e) {
-            log.error("Router MQTT publish failed. topic={}", topic, e);
+            log.error("라우터 MQTT publish 실패. topic={}", topic, e);
         }
     }
 }
