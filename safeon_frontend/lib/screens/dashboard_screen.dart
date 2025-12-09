@@ -12,6 +12,7 @@ import '../models/user_profile.dart';
 import '../models/user_session.dart';
 import '../services/safeon_api.dart';
 import '../services/notification_service.dart';
+import '../services/alert_stream_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/alert_tile.dart';
 import '../widgets/device_card.dart';
@@ -56,6 +57,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   bool _isPushnotificationsEnabled = true;
   bool _isUpdatingPushNotifications = false;
   bool _isUpdatingHomeMode = false;
+  AlertStreamService? _alertStream;
   Timer? _alertPollingTimer;
   static const Duration _alertPollingInterval = Duration(seconds: 30);
   bool _isPollingAlerts = false;
@@ -69,6 +71,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     _currentWeekStart = _startOfWeek(DateTime.now());
     _loadDashboard();
     _startAlertPolling();
+    _startAlertStream();
   }
 
   @override
@@ -82,6 +85,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   void dispose() {
     _alertPollingTimer?.cancel();
+    _alertStream?.stop();
     super.dispose();
   }
 
@@ -159,6 +163,38 @@ class _DashboardScreenState extends State<DashboardScreen> {
       _alertPollingInterval,
       (_) => _pollForNewAlerts(),
     );
+  }
+
+  Future<void> _startAlertStream() async {
+    _alertStream = AlertStreamService(baseUrl: widget.apiClient.baseUrl);
+    await _alertStream?.start(
+      token: widget.session.token,
+      onAlert: _handleIncomingAlert,
+      onError: (_) {},
+      onDone: () {
+        // SSE가 끊어지면 다음 폴링 주기에 맞춰 다시 시도한다.
+        Future.delayed(const Duration(seconds: 5), () {
+          if (mounted) {
+            _startAlertStream();
+          }
+        });
+      },
+    );
+  }
+
+  void _handleIncomingAlert(SafeOnAlert alert) async {
+    if (!mounted) return;
+    if (_knownAlertIds.contains(alert.id)) {
+      return;
+    }
+    setState(() {
+      _alerts = [alert, ..._alerts];
+      _knownAlertIds.add(alert.id);
+    });
+    if (_isPushnotificationsEnabled) {
+      await NotificationService.showAlertNotification(alert);
+    }
+    await _refreshDailyAnomalyCounts();
   }
 
   Future<void> _pollForNewAlerts() async {
@@ -788,7 +824,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             trailing: Switch(
               value: _isHomeModeArmed,
               onChanged: _isUpdatingHomeMode ? null : _handleHomeModeToggle,
-              activeThumbColor: SafeOnColors.primary,
+              // activeThumbColor: SafeOnColors.primary,
               activeTrackColor: SafeOnColors.primary.withValues(alpha: 0.3),
             ),
           ),
@@ -805,7 +841,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   _isNightlyAutoArmEnabled = value;
                 });
               },
-              activeThumbColor: SafeOnColors.primary,
+              // activeThumbColor: SafeOnColors.primary,
               activeTrackColor: SafeOnColors.primary.withValues(alpha: 0.3),
             ),
           ),
@@ -819,7 +855,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               value: _isPushnotificationsEnabled,
               onChanged:
                   _isUpdatingPushNotifications ? null : _handlePushNotificationToggle,
-              activeThumbColor: SafeOnColors.primary,
+              // activeThumbColor: SafeOnColors.primary,
               activeTrackColor: SafeOnColors.primary.withValues(alpha: 0.3),
             ),
           ),
