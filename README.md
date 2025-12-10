@@ -9,7 +9,7 @@
 
 ## 📎 Quick Links
 
-- [SafeOn System Architecture](docs/SafeOn_System_Architecture.png)
+- [SafeOn Blog](http://bit.ly/4pnOnlT)
 - [SafeOn Technical Documentation](docs/Lg_SafeOn.pdf)
 - [SafeOn Presentation (PDF)]()
 - [SafeOn Presentation (PPTX)]()
