@@ -47,7 +47,7 @@ SafeOn delivers an on-prem, privacy-preserving anomaly detection and response fr
 
 ---
 
-## Tech Stack (SafeOn – Local Development)
+## Tech Stack
 
 | classification | stack |
 |----------------|-------|
