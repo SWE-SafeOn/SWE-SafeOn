@@ -7,6 +7,15 @@
 
 ---
 
+## 📎 Quick Links
+
+- [SafeOn System Architecture](docs/SafeOn_System_Architecture.png)
+- [SafeOn Technical Documentation](docs/Lg_SafeOn.pdf)
+- [SafeOn Presentation (PDF)]()
+- [SafeOn Presentation (PPTX)]()
+
+---
+
 ## Project Proposal
 ### Problem
 Smart home networks contain many unmanaged IoT devices (cameras, locks, appliances) that rarely receive security updates. Traditional perimeter firewalls lack device-level visibility, leaving households exposed to lateral movement, data exfiltration, and botnet enrollment.
