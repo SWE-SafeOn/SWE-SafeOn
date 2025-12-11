@@ -12,7 +12,7 @@
 - [SafeOn Blog](http://bit.ly/4pnOnlT)
 - [SafeOn Technical Documentation](docs/Lg_SafeOn.pdf)
 - [SafeOn Presentation (PDF)](docs/SafeOn.pdf)
-- [SafeOn Presentation (PPTX)](docs/SafeOn.pptx)
+- [SafeOn Presentation (PPTX)](https://www.canva.com/design/DAG6aT0n1IE/sMlPKoqfvX0VOMyCP-Rjlw/edit?utm_content=DAG6aT0n1IE&utm_campaign=designshare&utm_medium=link2&utm_source=sharebutton)
 
 ---
 
