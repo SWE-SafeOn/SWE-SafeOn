@@ -58,10 +58,15 @@ public class DashboardController {
     // 하루동안의 이상치 탐지 개수
     @GetMapping("/anomalies/daily")
     public ResponseEntity<ApiResponseDto<DailyAnomalyCountResponseDto>> getDailyAnomalyCounts(
+            @AuthenticationPrincipal AuthenticatedUser currentUser,
             @RequestParam(name = "startDate", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
             @RequestParam(name = "endDate", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate
     ) {
-        DailyAnomalyCountResponseDto data = dashboardService.getDailyAnomalyCounts(startDate, endDate);
+        DailyAnomalyCountResponseDto data = dashboardService.getDailyAnomalyCounts(
+                currentUser.userId(),
+                startDate,
+                endDate
+        );
         return ResponseEntity.ok(ApiResponseDto.ok(data));
     }
                                                                                                                           
