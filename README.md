@@ -11,8 +11,8 @@
 
 - [SafeOn Blog](http://bit.ly/4pnOnlT)
 - [SafeOn Technical Documentation](docs/Lg_SafeOn.pdf)
-- [SafeOn Presentation (PDF)]()
-- [SafeOn Presentation (PPTX)]()
+- [SafeOn Presentation (PDF)](docs/SafeOn.pdf)
+- [SafeOn Presentation (PPTX)](docs/SafeOn.pptx)
 
 ---
 
